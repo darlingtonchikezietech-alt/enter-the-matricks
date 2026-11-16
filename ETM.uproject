@@ -1,0 +1,14 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "",
+	"Category": "",
+	"Description": "Enter The Matricks (codename ETM) - seated dual-cannon VR survival shooter. Quest 2 first.",
+	"Modules": [
+		{ "Name": "ETM", "Type": "Runtime", "LoadingPhase": "Default" }
+	],
+	"Plugins": [
+		{ "Name": "OpenXR", "Enabled": true },
+		{ "Name": "EnhancedInput", "Enabled": true }
+	],
+	"TargetPlatforms": [ "Android", "Windows" ]
+}

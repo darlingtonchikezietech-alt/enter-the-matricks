@@ -1,0 +1,11 @@
+name: heat-model
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run engine-independent heat model test (must match tracker tools/balance_sim.py)
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I Source/ETM Tools/HeatModelTest/heat_model_test.cpp -o heat_test
+          ./heat_test

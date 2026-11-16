@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# Every commit must reference a task: "[T-0012] summary"
+if ! head -n1 "$1" | grep -Eq '^\[T-[0-9]{4}\] .+'; then
+  echo "commit-msg: first line must start with a task tag, e.g. '[T-0012] Add heat parity test'" >&2
+  exit 1
+fi

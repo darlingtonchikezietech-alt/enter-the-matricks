@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Enforces the multi-agent protocol: every staged file must be inside a path owned by a
+# task the committing agent has claimed in the tracker repo. See tracker AGENTS.md.
+# Enable once per clone:  git config core.hooksPath .githooks
+TOP="$(git rev-parse --show-toplevel)"
+TRACKER="${ETM_TRACKER:-$TOP/../enter-the-matricks-tracker}"
+if [ -z "$ETM_AGENT" ]; then
+  echo "pre-commit: set ETM_AGENT to your agent name (see enter-the-matricks-tracker/AGENTS.md)" >&2
+  exit 1
+fi
+if [ ! -f "$TRACKER/tools/agent.py" ]; then
+  echo "pre-commit: tracker repo not found at $TRACKER (set ETM_TRACKER)" >&2
+  exit 1
+fi
+( cd "$TRACKER" && git pull --rebase --quiet >/dev/null 2>&1 )
+python3 "$TRACKER/tools/agent.py" --agent "$ETM_AGENT" check-staged --dir "$TOP" --repo game

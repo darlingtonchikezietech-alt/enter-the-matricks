@@ -1,0 +1,29 @@
+# Unreal generated
+Binaries/
+Build/*
+!Build/Android/
+Build/Android/*
+!Build/Android/*.xml
+DerivedDataCache/
+Intermediate/
+Saved/
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+.vs/
+.vscode/
+.idea/
+*.xcodeproj
+*.xcworkspace
+# Android/Quest
+*.apk
+*.obb
+*.keystore
+# OS
+.DS_Store
+Thumbs.db
