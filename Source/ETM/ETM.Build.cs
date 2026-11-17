@@ -11,10 +11,9 @@ public class ETM : ModuleRules
 		PublicDependencyModuleNames.AddRange(new string[]
 		{
 			"Core", "CoreUObject", "Engine", "InputCore",
-			"HeadMountedDisplay", // UMotionControllerComponent, HMD function library
+			"HeadMountedDisplay", // UMotionControllerComponent
+			"XRBase",             // UHeadMountedDisplayFunctionLibrary (XRBase plugin in UE 5.8)
 			"EnhancedInput"
 		});
-
-		// T-0005: depending on the locked engine version, "XRBase" may also be required.
 	}
 }
