@@ -1,4 +1,5 @@
 #include "Enemies/Base/EnemyBase.h"
+#include "Enemies/Base/AttackTokenSubsystem.h"
 #include "ETM.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
@@ -50,6 +51,11 @@ bool AEnemyBase::SetState(EEnemyState NewState)
 	}
 
 	const EEnemyState OldState = State;
+
+	if (OldState == EEnemyState::Attacking)
+	{
+		ReleaseAttackToken(); // whatever ends the attack state returns the token
+	}
 
 	// Leaving an attack that has not resolved means it was stopped: nothing is dealt, and the
 	// damage it would have done is reported as prevented.
@@ -131,6 +137,7 @@ void AEnemyBase::Deactivate()
 
 	// Not a kill: go straight to the pool without a death sequence or a kill event.
 	const EEnemyState OldState = State;
+	ReleaseAttackToken();
 	bAttackPending = false;
 	PendingAttackDamage = 0.f;
 	PendingAttackTarget.Reset();
@@ -185,6 +192,7 @@ void AEnemyBase::AdvanceState(float DeltaTime)
 				AActor* Target = PendingAttackTarget.Get();
 				const float Damage = PendingAttackDamage;
 				bAttackPending = false; // resolved, so leaving the state is not an interruption
+				ReleaseAttackToken();
 				PendingAttackDamage = 0.f;
 				PendingAttackTarget.Reset();
 				ResolveAttack(Target, Damage);
@@ -223,11 +231,35 @@ void AEnemyBase::AdvanceState(float DeltaTime)
 // Attacks
 // ---------------------------------------------------------------------------------------------
 
+void AEnemyBase::ReleaseAttackToken()
+{
+	if (UAttackTokenSubsystem* Tokens = GetWorld() ? GetWorld()->GetSubsystem<UAttackTokenSubsystem>() : nullptr)
+	{
+		Tokens->Release(this);
+	}
+}
+
+void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ReleaseAttackToken();
+	Super::EndPlay(EndPlayReason);
+}
+
 bool AEnemyBase::BeginAttack(AActor* Target, float Damage, float TelegraphSeconds)
 {
 	if (bAttackPending) return false; // one attack at a time
+	if (!ETMEnemy::CanDealDamage(State)) return false;
+
+	// Attack tokens (bible section 14: at most 2 dangerous attacks at once). Refused: try again later.
+	UAttackTokenSubsystem* Tokens = bUsesAttackToken && GetWorld() ? GetWorld()->GetSubsystem<UAttackTokenSubsystem>() : nullptr;
+	if (Tokens && !Tokens->TryAcquire(this)) return false;
+
 	// An enemy already in the attack state with nothing pending may chain a new attack.
-	if (State != EEnemyState::Attacking && !SetState(EEnemyState::Attacking)) return false;
+	if (State != EEnemyState::Attacking && !SetState(EEnemyState::Attacking))
+	{
+		if (Tokens) Tokens->Release(this);
+		return false;
+	}
 
 	PendingAttackTarget = Target;
 	PendingAttackDamage = FMath::Max(0.f, Damage);
