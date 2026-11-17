@@ -14,6 +14,7 @@
 class UCameraComponent;
 class UMotionControllerComponent;
 class UCannonComponent;
+class UCannonFeedbackComponent;
 class UDefenseComponent;
 class UIntegrityComponent;
 
@@ -74,6 +75,9 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<USceneComponent> RightMount;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonComponent> LeftCannon;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonComponent> RightCannon;
+	/** Shot presentation for each cannon: recoil, flash, tracer, impact, haptics, report. Cosmetic only. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonFeedbackComponent> LeftFeedback;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonFeedbackComponent> RightFeedback;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UDefenseComponent> Defense;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UIntegrityComponent> RigIntegrity;
 

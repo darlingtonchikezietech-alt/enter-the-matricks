@@ -8,6 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CoreDelegates.h"
 #include "Weapons/CannonComponent.h"
+#include "Weapons/Feedback/CannonFeedbackComponent.h"
 #include "Combat/DefenseComponent.h"
 #include "Combat/IntegrityComponent.h"
 
@@ -56,6 +57,14 @@ AXRSeatedRigPawn::AXRSeatedRigPawn()
 
 	RightCannon = CreateDefaultSubobject<UCannonComponent>(TEXT("RightCannon"));
 	RightCannon->SetupAttachment(RightMount);
+
+	// Shot feedback rides on each cannon, so recoil moves the weapon and never the camera (bible section 11).
+	LeftFeedback = CreateDefaultSubobject<UCannonFeedbackComponent>(TEXT("LeftFeedback"));
+	LeftFeedback->SetupAttachment(LeftCannon);
+	LeftFeedback->bLeftHand = true;
+	RightFeedback = CreateDefaultSubobject<UCannonFeedbackComponent>(TEXT("RightFeedback"));
+	RightFeedback->SetupAttachment(RightCannon);
+	RightFeedback->bLeftHand = false;
 
 	Defense = CreateDefaultSubobject<UDefenseComponent>(TEXT("Defense"));
 	RigIntegrity = CreateDefaultSubobject<UIntegrityComponent>(TEXT("RigIntegrity"));
