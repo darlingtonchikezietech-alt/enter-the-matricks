@@ -32,6 +32,22 @@ This keeps the P-15 constraint: nothing here depends on a Horizon OS feature new
 
 If a later task needs a Meta-only feature (for example application spacewarp or fixed foveated rendering control), add the Meta XR plugin in its own task and check its minimum Horizon OS version against P-15 first.
 
+## Supported headsets (P-31, tracker ADR-0003)
+
+One APK for all three. Quest 2 is the performance floor; Quest 3 and 3S run the same settings until measured.
+
+| Headset | Engine device profile | Controllers (OpenXR profile used) | Refresh rate | Verified on device |
+|---|---|---|---|---|
+| Quest 2 | `Oculus_Quest2` | Touch (`/interaction_profiles/oculus/touch_controller`) | 72 Hz | No (T-0006) |
+| Quest 3 | `Meta_Quest_3` | Touch Plus, served by Meta's runtime through the same Touch profile | 72 Hz | No (T-0047) |
+| Quest 3S | `Meta_Quest_3S` | Touch Plus, as Quest 3 | 72 Hz | No (T-0047) |
+
+- The manifest's `com.oculus.supportedDevices` lists `quest2|questpro|quest3|quest3s` (`Config/DefaultEngine.ini`). Quest Pro is there from Epic's template but is not a promised target; T-0041 decides whether it stays.
+- `Config/DefaultDeviceProfiles.ini` gives Quest 3 and 3S the Quest 2 value of `sg.ShadowQuality` (1). Without it the engine's profiles give them 2. The test `ETM.Platform.DeviceProfiles.Quest3MatchesQuest2` fails if the three headsets ever stop sharing the same settings.
+- Each headset renders at its own OpenXR recommended resolution, so Quest 3 and 3S draw more pixels than Quest 2 on a faster GPU. Measure this before raising anything else on them.
+- The engine's OpenXR plugin declares only the Oculus Touch interaction profile. That Touch Plus works through it is expected from Meta's runtime, not yet seen on a headset.
+- Everything above is checked in the editor only. No Quest 3 or 3S has run the game yet.
+
 ## What T-0005 verified
 
 | Check | Result |
