@@ -1,5 +1,6 @@
 #include "Input/RigPlayerController.h"
 #include "Input/RigInputSaveGame.h"
+#include "Save/ETMSaveStore.h"
 #include "Player/XRSeatedRigPawn.h"
 #include "ETM.h"
 #include "EnhancedInputSubsystems.h"
@@ -130,7 +131,8 @@ void ARigPlayerController::SetControlScheme(ERigControlScheme NewScheme, bool bS
 	{
 		URigInputSaveGame* Save = NewObject<URigInputSaveGame>();
 		Save->ControlScheme = NewScheme;
-		if (!UGameplayStatics::SaveGameToSlot(Save, URigInputSaveGame::SlotName(), URigInputSaveGame::UserIndex))
+		// Checked format with a backup copy: a damaged file can make the engine's own loader crash (T-0052).
+		if (!UETMSaveStore::SaveChecked(Save, URigInputSaveGame::SlotName()))
 		{
 			UE_LOG(LogETM, Warning, TEXT("Could not write input save slot '%s'."), URigInputSaveGame::SlotName());
 		}
@@ -139,9 +141,7 @@ void ARigPlayerController::SetControlScheme(ERigControlScheme NewScheme, bool bS
 
 void ARigPlayerController::LoadSavedScheme()
 {
-	if (!UGameplayStatics::DoesSaveGameExist(URigInputSaveGame::SlotName(), URigInputSaveGame::UserIndex)) return;
-	const URigInputSaveGame* Save = Cast<URigInputSaveGame>(
-		UGameplayStatics::LoadGameFromSlot(URigInputSaveGame::SlotName(), URigInputSaveGame::UserIndex));
+	const URigInputSaveGame* Save = Cast<URigInputSaveGame>(UETMSaveStore::LoadChecked(URigInputSaveGame::SlotName()));
 	if (Save && Save->Version == URigInputSaveGame::CurrentVersion)
 	{
 		SetControlScheme(Save->ControlScheme, /*bSave*/ false);

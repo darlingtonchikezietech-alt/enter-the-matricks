@@ -10,6 +10,7 @@
 #include "Weapons/CannonComponent.h"
 #include "Weapons/Feedback/CannonFeedbackComponent.h"
 #include "UI/HUDPresenterComponent.h"
+#include "Save/ETMSaveStore.h"
 #include "Combat/DefenseComponent.h"
 #include "Combat/IntegrityComponent.h"
 
@@ -198,7 +199,8 @@ bool AXRSeatedRigPawn::SaveCalibration() const
 	UETMCalibrationSaveGame* Save = NewObject<UETMCalibrationSaveGame>();
 	Save->LeftAimOffset = LeftAimOffset;
 	Save->RightAimOffset = RightAimOffset;
-	const bool bSaved = UGameplayStatics::SaveGameToSlot(Save, UETMCalibrationSaveGame::SlotName(), UETMCalibrationSaveGame::UserIndex);
+	// Checked format with a backup copy: a damaged file can make the engine's own loader crash (T-0052).
+	const bool bSaved = UETMSaveStore::SaveChecked(Save, UETMCalibrationSaveGame::SlotName());
 	if (!bSaved)
 	{
 		UE_LOG(LogETM, Warning, TEXT("Could not write calibration save slot '%s'."), UETMCalibrationSaveGame::SlotName());
@@ -208,12 +210,12 @@ bool AXRSeatedRigPawn::SaveCalibration() const
 
 bool AXRSeatedRigPawn::LoadCalibration()
 {
-	if (!UGameplayStatics::DoesSaveGameExist(UETMCalibrationSaveGame::SlotName(), UETMCalibrationSaveGame::UserIndex))
+	if (!UGameplayStatics::DoesSaveGameExist(UETMCalibrationSaveGame::SlotName(), UETMCalibrationSaveGame::UserIndex)
+		&& !UGameplayStatics::DoesSaveGameExist(FString(UETMCalibrationSaveGame::SlotName()) + TEXT("_bak"), UETMCalibrationSaveGame::UserIndex))
 	{
 		return false;
 	}
-	const UETMCalibrationSaveGame* Save = Cast<UETMCalibrationSaveGame>(
-		UGameplayStatics::LoadGameFromSlot(UETMCalibrationSaveGame::SlotName(), UETMCalibrationSaveGame::UserIndex));
+	const UETMCalibrationSaveGame* Save = Cast<UETMCalibrationSaveGame>(UETMSaveStore::LoadChecked(UETMCalibrationSaveGame::SlotName()));
 	if (!Save || Save->Version != UETMCalibrationSaveGame::CurrentVersion)
 	{
 		UE_LOG(LogETM, Warning, TEXT("Calibration save slot '%s' is unreadable or from another version; using defaults."), UETMCalibrationSaveGame::SlotName());
