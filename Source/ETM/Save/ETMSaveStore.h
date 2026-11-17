@@ -63,6 +63,17 @@ public:
 	/** Writes any save object to a slot in this store's checked format (main copy plus backup). */
 	bool WriteSlot(class USaveGame* Save, const FString& Slot);
 
+	/**
+	 * For other systems' own slots (calibration, control scheme): writes Save in the checked format,
+	 * synchronously, to Slot and its backup. Returns false if either write failed.
+	 */
+	static bool SaveChecked(class USaveGame* Save, const FString& Slot);
+	/**
+	 * Reads a slot written by SaveChecked or a store: the main copy if its header and CRC are intact, else
+	 * the backup, else null. Never hands damaged bytes to the engine's parser. The caller checks class and version.
+	 */
+	static class USaveGame* LoadChecked(const FString& Slot);
+
 	/** Writes that failed since startup (disk full, permissions). Shown to QA; the game carries on. */
 	UFUNCTION(BlueprintPure, Category = "ETM|Save") int32 GetFailedWrites() const { return FailedWrites; }
 

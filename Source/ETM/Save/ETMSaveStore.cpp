@@ -52,9 +52,8 @@ namespace
 		return Wrapped;
 	}
 
-	/** One copy, checked. Null if missing, damaged, the wrong class or the wrong version. */
-	template <typename T>
-	T* LoadOne(const FString& Slot)
+	/** One copy, header and CRC checked, then parsed. Null if missing or damaged. */
+	USaveGame* LoadOneRaw(const FString& Slot)
 	{
 		TArray<uint8> Wrapped, Payload;
 		if (!UGameplayStatics::DoesSaveGameExist(Slot, 0) || !UGameplayStatics::LoadDataFromSlot(Wrapped, Slot, 0)) return nullptr;
@@ -63,7 +62,15 @@ namespace
 			UE_LOG(LogETM, Warning, TEXT("Save slot '%s' is damaged (checksum)."), *Slot);
 			return nullptr;
 		}
-		T* Loaded = Cast<T>(UGameplayStatics::LoadGameFromMemory(Payload));
+		return UGameplayStatics::LoadGameFromMemory(Payload);
+	}
+
+	/** One copy, checked. Null if missing, damaged, the wrong class or the wrong version. */
+	template <typename T>
+	T* LoadOne(const FString& Slot)
+	{
+		if (!UGameplayStatics::DoesSaveGameExist(Slot, 0)) return nullptr;
+		T* Loaded = Cast<T>(LoadOneRaw(Slot));
 		if (!Loaded)
 		{
 			UE_LOG(LogETM, Warning, TEXT("Save slot '%s' is unreadable."), *Slot);
@@ -131,6 +138,29 @@ void UETMSaveStore::LoadAll()
 bool UETMSaveStore::WriteSlot(USaveGame* Save, const FString& Slot)
 {
 	return Write(Save, Slot);
+}
+
+bool UETMSaveStore::SaveChecked(USaveGame* Save, const FString& Slot)
+{
+	TArray<uint8> Payload;
+	if (!Save || !UGameplayStatics::SaveGameToMemory(Save, Payload)) return false;
+	uint64 Sequence = 0;
+	{
+		FScopeLock Lock(&WriteLock);
+		Sequence = ++LatestWrite.FindOrAdd(Slot);
+	}
+	return WriteWrapped(Wrap(Payload), Slot, Sequence);
+}
+
+USaveGame* UETMSaveStore::LoadChecked(const FString& Slot)
+{
+	if (USaveGame* Main = LoadOneRaw(Slot)) return Main;
+	if (USaveGame* Backup = LoadOneRaw(BackupOf(Slot)))
+	{
+		UE_LOG(LogETM, Warning, TEXT("Save slot '%s' restored from its backup."), *Slot);
+		return Backup;
+	}
+	return nullptr;
 }
 
 bool UETMSaveStore::Write(USaveGame* Save, const FString& Slot)
