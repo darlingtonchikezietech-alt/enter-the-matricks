@@ -15,6 +15,7 @@ class UCameraComponent;
 class UMotionControllerComponent;
 class UCannonComponent;
 class UCannonFeedbackComponent;
+class UHUDPresenterComponent;
 class UDefenseComponent;
 class UIntegrityComponent;
 
@@ -78,6 +79,8 @@ public:
 	/** Shot presentation for each cannon: recoil, flash, tracer, impact, haptics, report. Cosmetic only. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonFeedbackComponent> LeftFeedback;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UCannonFeedbackComponent> RightFeedback;
+	/** The diegetic HUD on the frame, housings and in the world (bible section 11). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UHUDPresenterComponent> HUD;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UDefenseComponent> Defense;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ETM|Rig") TObjectPtr<UIntegrityComponent> RigIntegrity;
 
