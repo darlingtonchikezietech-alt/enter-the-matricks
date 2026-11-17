@@ -45,6 +45,11 @@ public:
 	 * the mission has not failed.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "ETM|Mission") bool RetryFromLastCheckpoint();
+	/**
+	 * Continues from a checkpoint saved before the app closed (T-0023). Start the encounter first, then call
+	 * this: it restores as a retry does (boss checkpoints use the P-04 preset) without counting as a retry.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ETM|Mission") bool ResumeFromCheckpoint(const FMissionCheckpoint& Checkpoint);
 
 	UFUNCTION(BlueprintPure, Category = "ETM|Mission") EMissionState GetState() const { return State; }
 	UFUNCTION(BlueprintPure, Category = "ETM|Mission") EMissionFailReason GetFailReason() const { return FailReason; }
@@ -63,6 +68,7 @@ private:
 	UFUNCTION() void HandleRigDepleted();
 	UFUNCTION() void HandleObjectiveDepleted();
 	void Fail(EMissionFailReason Reason);
+	void RestoreLastCheckpoint(bool bCountAsRetry);
 	UIntegrityComponent* GetObjectiveIntegrity() const;
 
 	UPROPERTY(Transient) TWeakObjectPtr<UIntegrityComponent> Rig;
