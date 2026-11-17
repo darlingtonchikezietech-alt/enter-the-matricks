@@ -9,6 +9,7 @@
 #include "Misc/CoreDelegates.h"
 #include "Weapons/CannonComponent.h"
 #include "Weapons/Feedback/CannonFeedbackComponent.h"
+#include "UI/HUDPresenterComponent.h"
 #include "Combat/DefenseComponent.h"
 #include "Combat/IntegrityComponent.h"
 
@@ -65,6 +66,9 @@ AXRSeatedRigPawn::AXRSeatedRigPawn()
 	RightFeedback = CreateDefaultSubobject<UCannonFeedbackComponent>(TEXT("RightFeedback"));
 	RightFeedback->SetupAttachment(RightCannon);
 	RightFeedback->bLeftHand = false;
+
+	HUD = CreateDefaultSubobject<UHUDPresenterComponent>(TEXT("HUD"));
+	HUD->SetupAttachment(RootComponent);
 
 	Defense = CreateDefaultSubobject<UDefenseComponent>(TEXT("Defense"));
 	RigIntegrity = CreateDefaultSubobject<UIntegrityComponent>(TEXT("RigIntegrity"));
