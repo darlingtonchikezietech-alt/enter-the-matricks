@@ -88,6 +88,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float StaggerDamageThreshold = 0.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float StaggerWindow = 1.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy") TArray<FEnemyPart> Parts;
+	/** Attacks need a token from UAttackTokenSubsystem (max 2 at once). Turn off only for harmless attacks. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy") bool bUsesAttackToken = true;
 
 	// ---- Events ----
 
@@ -101,6 +103,7 @@ public:
 
 protected:
 	virtual void PostInitializeComponents() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Called after every state change. Archetypes start and stop movement, animation and effects here. */
 	virtual void HandleStateChanged(EEnemyState NewState, EEnemyState OldState) {}
@@ -116,6 +119,7 @@ protected:
 
 private:
 	bool SetState(EEnemyState NewState);
+	void ReleaseAttackToken();
 	void ApplyBodyDamage(float Amount);
 	void ApplyPartDamage(FEnemyPart& Part, float Amount);
 	FEnemyPart* FindPartForComponent(const UPrimitiveComponent* Component);

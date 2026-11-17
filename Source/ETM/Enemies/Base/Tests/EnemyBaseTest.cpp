@@ -6,6 +6,7 @@
 
 #include "Enemies/Base/EnemyBase.h"
 #include "Enemies/Base/EnemyPoolSubsystem.h"
+#include "Enemies/Base/AttackTokenSubsystem.h"
 #include "Enemies/Base/Tests/EnemyTestListener.h"
 #include "Combat/IntegrityComponent.h"
 #include "Components/BoxComponent.h"
@@ -402,6 +403,75 @@ bool FETMEnemyPoolTest::RunTest(const FString&)
 	// Checkpoint retry parks everything with no kill events.
 	Pool->DeactivateAll();
 	TestEqual(TEXT("DeactivateAll parks everything"), Pool->GetActiveCount(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMEnemyAttackTokenTest, "ETM.Enemies.Base.AttackTokens", ETMEnemyTestFlags)
+bool FETMEnemyAttackTokenTest::RunTest(const FString&)
+{
+	FTestWorld W;
+	UIntegrityComponent* Objective = W.SpawnObjective();
+	AActor* Target = Objective->GetOwner();
+	UAttackTokenSubsystem* Tokens = W.World->GetSubsystem<UAttackTokenSubsystem>();
+	TestNotNull(TEXT("Token subsystem exists"), Tokens);
+	if (!Tokens) return false;
+	TestEqual(TEXT("Default limit is 2 (bible section 14)"), Tokens->GetMaxConcurrentAttacks(), 2);
+
+	TArray<AEnemyBase*> Enemies;
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		AEnemyBase* Enemy = W.SpawnEnemy();
+		Enemy->MarkPooled();
+		Enemy->Activate(FTransform::Identity);
+		Advance(Enemy, 1.f);
+		Enemies.Add(Enemy);
+	}
+
+	TestTrue(TEXT("First attack gets a token"), Enemies[0]->BeginAttack(Target, 10.f, 1.f));
+	TestTrue(TEXT("Second attack gets a token"), Enemies[1]->BeginAttack(Target, 10.f, 1.f));
+	TestFalse(TEXT("Third attack is held back"), Enemies[2]->BeginAttack(Target, 10.f, 1.f));
+	TestEqual(TEXT("Held-back enemy keeps approaching"), Enemies[2]->GetState(), EEnemyState::Approaching);
+	TestEqual(TEXT("Two tokens in use"), Tokens->GetTokensInUse(), 2);
+	TestEqual(TEXT("The refusal is counted"), Tokens->GetRefusedCount(), 1);
+
+	// Resolving returns the token.
+	Advance(Enemies[0], 1.1f);
+	TestEqual(TEXT("Attack resolved"), Objective->GetCurrent(), 490.f);
+	TestTrue(TEXT("Freed token goes to the next attacker"), Enemies[2]->BeginAttack(Target, 10.f, 1.f));
+
+	// Death during the warning returns it.
+	Enemies[1]->Kill();
+	TestTrue(TEXT("Killing an attacker frees its token"), Enemies[3]->BeginAttack(Target, 10.f, 1.f));
+
+	// Stagger returns it.
+	Enemies[2]->Interrupt();
+	TestTrue(TEXT("Staggering an attacker frees its token"), Enemies[4]->BeginAttack(Target, 10.f, 1.f));
+
+	// Parking returns it.
+	Enemies[3]->Deactivate();
+	TestEqual(TEXT("Parking an attacker frees its token"), Tokens->GetTokensInUse(), 1);
+
+	// Lowering the limit leaves the attack in progress alone and blocks new ones.
+	Tokens->SetMaxConcurrentAttacks(1);
+	Advance(Enemies[0], 1.f);
+	TestFalse(TEXT("Lower limit blocks a new attack"), Enemies[0]->BeginAttack(Target, 10.f, 1.f));
+	TestTrue(TEXT("The attack in progress continues"), Enemies[4]->GetState() == EEnemyState::Attacking);
+	Advance(Enemies[4], 1.1f);
+	TestEqual(TEXT("It still lands"), Objective->GetCurrent(), 480.f);
+
+	// A harmless attack can opt out.
+	Tokens->SetMaxConcurrentAttacks(0);
+	Enemies[0]->bUsesAttackToken = false;
+	TestTrue(TEXT("An attack that opts out ignores the limit"), Enemies[0]->BeginAttack(Target, 0.f, 1.f));
+
+	// A destroyed attacker cannot hold a token forever.
+	Tokens->SetMaxConcurrentAttacks(1);
+	AEnemyBase* Doomed = W.SpawnEnemy();
+	Doomed->Activate(FTransform::Identity);
+	Advance(Doomed, 1.f);
+	TestTrue(TEXT("Attacker takes the only token"), Doomed->BeginAttack(Target, 10.f, 5.f));
+	Doomed->Destroy();
+	TestEqual(TEXT("Destroying it returns the token"), Tokens->GetTokensInUse(), 0);
 	return true;
 }
 
