@@ -100,6 +100,22 @@ void UMissionStateSubsystem::Fail(EMissionFailReason Reason)
 bool UMissionStateSubsystem::RetryFromLastCheckpoint()
 {
 	if (State != EMissionState::Failed) return false;
+	RestoreLastCheckpoint(/*bCountAsRetry*/ true);
+	return true;
+}
+
+bool UMissionStateSubsystem::ResumeFromCheckpoint(const FMissionCheckpoint& Checkpoint)
+{
+	// After an app restart: the level has just loaded and the encounter has started; jump to the saved point
+	// exactly as a retry would, including the P-04 boss preset, but it is not a retry for the stats.
+	if (!Checkpoint.bValid) return false;
+	LastCheckpoint = Checkpoint;
+	RestoreLastCheckpoint(/*bCountAsRetry*/ false);
+	return true;
+}
+
+void UMissionStateSubsystem::RestoreLastCheckpoint(bool bCountAsRetry)
+{
 
 	// Every enemy is parked with no death sequence; the director repopulates the phase.
 	// Enemies placed in the level or spawned outside the pool are parked too, not only pooled ones.
@@ -141,7 +157,6 @@ bool UMissionStateSubsystem::RetryFromLastCheckpoint()
 
 	State = EMissionState::Running;
 	FailReason = EMissionFailReason::None;
-	++RetryCount;
+	if (bCountAsRetry) ++RetryCount;
 	OnRetryStarted.Broadcast(LastCheckpoint);
-	return true;
 }
