@@ -79,24 +79,31 @@ void ANeedleDrone::UpdateBehavior(float DeltaSeconds)
 	{
 		CooldownRemaining = FMath::Max(0.f, CooldownRemaining - DeltaSeconds);
 
-		const FVector Here = GetActorLocation();
-		const FVector ToHover = HoverLocation - Here;
-		const float Distance = ToHover.Size();
-		if (Distance > ArriveTolerance)
+		if (!bArrived)
 		{
-			SetActorLocation(Here + ToHover.GetSafeNormal() * FMath::Min(MoveSpeed * DeltaSeconds, Distance));
+			// Fly straight to the hover point first.
+			MoveToward(HoverLocation, DeltaSeconds);
+			bArrived = FVector::Dist(GetActorLocation(), HoverLocation) <= ArriveTolerance;
+		}
+		else
+		{
+			DriftTime += DeltaSeconds * DriftRate;
+			MoveToward(HoverLocation + GetDriftOffset(), DeltaSeconds);
 		}
 
 		AActor* Rig = ResolveTarget();
 		if (!Rig) return;
 		SetActorRotation((Rig->GetActorLocation() - GetActorLocation()).Rotation());
-		if (Distance <= ArriveTolerance && CooldownRemaining <= 0.f)
+		if (bArrived && CooldownRemaining <= 0.f)
 		{
 			BeginAttack(Rig, BurstDamage, TelegraphSeconds);
 		}
 		break;
 	}
 	case EEnemyState::Attacking:
+		// Keeps drifting during the warning, but slowly, so the aiming line reads.
+		DriftTime += DeltaSeconds * DriftRate * DriftRateWhileWarning;
+		MoveToward(HoverLocation + GetDriftOffset(), DeltaSeconds);
 		UpdateAimLine();
 		if (TelegraphAudio && TelegraphAudio->Sound)
 		{
@@ -131,6 +138,13 @@ void ANeedleDrone::HandleStateChanged(EEnemyState NewState, EEnemyState OldState
 	if (NewState == EEnemyState::Spawning)
 	{
 		CooldownRemaining = 0.f;
+		bArrived = false;
+		DriftTime = 0.f;
+		{
+			// Each drone gets its own drift pattern.
+			FRandomStream Random(GetUniqueID() + static_cast<int32>(GetWorld() ? GetWorld()->GetTimeSeconds() * 1000.0 : 0.0));
+			DriftPhase = FVector(Random.FRandRange(0.f, 2.f * PI), Random.FRandRange(0.f, 2.f * PI), Random.FRandRange(0.f, 2.f * PI));
+		}
 		if (!bHoverAssigned)
 		{
 			HoverLocation = GetActorLocation() + FVector(0.f, 0.f, HoverHeight);
@@ -145,6 +159,37 @@ void ANeedleDrone::HandleStateChanged(EEnemyState NewState, EEnemyState OldState
 		Target.Reset();
 		bHoverAssigned = false;
 	}
+}
+
+void ANeedleDrone::MoveToward(const FVector& Goal, float DeltaSeconds)
+{
+	const FVector Here = GetActorLocation();
+	const FVector Delta = Goal - Here;
+	const float Distance = Delta.Size();
+	if (Distance > KINDA_SMALL_NUMBER)
+	{
+		SetActorLocation(Here + Delta / Distance * FMath::Min(MoveSpeed * DeltaSeconds, Distance));
+	}
+}
+
+FVector ANeedleDrone::GetDriftOffset() const
+{
+	// Three slow sine waves at unrelated rates: never quite repeats, never jerks. The sideways sweep is the
+	// largest, so the drone crosses the player's view rather than coming at them. Ramps in after arrival.
+	const float T = DriftTime;
+	const float Ramp = FMath::Clamp(T / DriftRampSeconds, 0.f, 1.f);
+	const float Sideways = FMath::Sin(0.9f * T + DriftPhase.Y) - FMath::Sin(DriftPhase.Y);
+	const float Vertical = FMath::Sin(1.3f * T + DriftPhase.Z) - FMath::Sin(DriftPhase.Z);
+	const float Depth = FMath::Sin(0.6f * T + DriftPhase.X) - FMath::Sin(DriftPhase.X);
+
+	// The rig's view: toward/away from the rig, sideways, up.
+	const AActor* Rig = Target.Get();
+	FVector Toward = Rig ? (Rig->GetActorLocation() - HoverLocation) : FVector::ForwardVector;
+	Toward.Z = 0.f;
+	Toward = Toward.GetSafeNormal(KINDA_SMALL_NUMBER, FVector::ForwardVector);
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, Toward);
+	// Each wave is in [-2, 2] after the start offset; halve it so the zone is DriftHalfExtent.
+	return Ramp * 0.5f * (Toward * Depth * DriftHalfExtent.X + Side * Sideways * DriftHalfExtent.Y + FVector::UpVector * Vertical * DriftHalfExtent.Z);
 }
 
 void ANeedleDrone::ResolveAttack(AActor* AttackTarget, float Damage)

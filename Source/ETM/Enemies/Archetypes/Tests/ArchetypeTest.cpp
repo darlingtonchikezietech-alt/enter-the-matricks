@@ -6,7 +6,9 @@
 
 #include "Enemies/Archetypes/Shardling.h"
 #include "Enemies/Archetypes/NeedleDrone.h"
+#include "Enemies/Base/EnemyDeathBurst.h"
 #include "Enemies/Base/EnemyPoolSubsystem.h"
+#include "EngineUtils.h"
 #include "Objectives/MissionObjective.h"
 #include "Objectives/MissionStateSubsystem.h"
 #include "Combat/IntegrityComponent.h"
@@ -262,6 +264,77 @@ bool FETMArchetypePoolTest::RunTest(const FString&)
 		TestEqual(TEXT("Reused Shardling has its limbs down"), Shardling->LeftLimbPivot->GetRelativeRotation().Pitch, 0.0);
 	}
 	TestEqual(TEXT("Reuse creates no new actors"), Pool->GetTotalCreated(), Created);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMNeedleDroneDriftTest, "ETM.Enemies.Archetypes.NeedleDrone.DriftsAroundHoverPoint", ETMArchetypeTestFlags)
+bool FETMNeedleDroneDriftTest::RunTest(const FString&)
+{
+	// Owner headset test (T-0058): drones should keep moving around their spot, mostly sideways and up and
+	// down as the rig sees them, so the player tracks and shoots them, instead of standing in one place.
+	FTestWorld W;
+	ANeedleDrone* Drone = W.SpawnEnemy<ANeedleDrone>(FVector(1500.f, 0.f, 100.f));
+	Drone->SetTarget(W.RigActor);
+	for (int32 Frame = 0; Frame < 72 * 10 && !Drone->HasArrived(); ++Frame) Drone->SimulateStep(Frame72);
+	TestTrue(TEXT("Arrived at its hover point"), Drone->HasArrived());
+
+	const FVector Hover = Drone->GetHoverLocation();
+	FVector Min(FLT_MAX), Max(-FLT_MAX);
+	FVector Last = Drone->GetActorLocation();
+	float SlowestSecond = FLT_MAX, Moved = 0.f;
+	for (int32 Frame = 1; Frame <= 72 * 12; ++Frame)
+	{
+		Drone->SimulateStep(Frame72);
+		const FVector Offset = Drone->GetActorLocation() - Hover;
+		Min = Min.ComponentMin(Offset);
+		Max = Max.ComponentMax(Offset);
+		Moved += FVector::Dist(Drone->GetActorLocation(), Last);
+		Last = Drone->GetActorLocation();
+		if (Frame > 72 * 3 && Frame % 72 == 0) { SlowestSecond = FMath::Min(SlowestSecond, Moved); }
+		if (Frame % 72 == 0) Moved = 0.f;
+	}
+	// The rig is along -X from the drone, so sideways is Y and up is Z.
+	const FVector Ext = Drone->DriftHalfExtent;
+	TestTrue(FString::Printf(TEXT("Sweeps sideways (%.0f cm)"), Max.Y - Min.Y), Max.Y - Min.Y >= Ext.Y * 0.8f);
+	TestTrue(FString::Printf(TEXT("Moves up and down (%.0f cm)"), Max.Z - Min.Z), Max.Z - Min.Z >= Ext.Z * 0.6f);
+	TestTrue(TEXT("Stays inside its zone"), Max.Y <= Ext.Y + 5.f && -Min.Y <= Ext.Y + 5.f && Max.Z <= Ext.Z + 5.f && -Min.Z <= Ext.Z + 5.f
+		&& Max.X <= Ext.X + 5.f && -Min.X <= Ext.X + 5.f);
+	TestTrue(FString::Printf(TEXT("Never stands still (slowest second %.0f cm)"), SlowestSecond), SlowestSecond >= 15.f);
+	TestTrue(TEXT("Still attacking while it drifts"), W.Rig->GetCurrent() < 300.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMDeathBurstTest, "ETM.Enemies.Archetypes.DeathBurst", ETMArchetypeTestFlags)
+bool FETMDeathBurstTest::RunTest(const FString&)
+{
+	// Owner headset test (T-0058): a killed enemy goes in a small explosion.
+	FTestWorld W;
+	AShardling* Shardling = W.SpawnEnemy<AShardling>(FVector(800.f, 0.f, 0.f));
+	Run(Shardling, 1.f);
+	Shardling->Kill();
+	TestTrue(TEXT("Enemy hidden once it explodes"), Shardling->IsHidden());
+	AEnemyDeathBurst* Burst = nullptr;
+	for (TActorIterator<AEnemyDeathBurst> It(W.World); It; ++It) Burst = *It;
+	TestNotNull(TEXT("Explosion spawned"), Burst);
+	if (!Burst) return false;
+	TestTrue(TEXT("Where the enemy was"), FVector::Dist2D(Burst->GetActorLocation(), Shardling->GetActorLocation()) < 100.f);
+	TestEqual(TEXT("Debris pieces"), Burst->GetDebrisCount(), 6);
+	Burst->AdvanceBurst(0.05f);
+	TestTrue(TEXT("Flash shows"), Burst->IsFlashVisible());
+	Burst->AdvanceBurst(0.4f);
+	TestFalse(TEXT("Flash gone after a moment"), Burst->IsFlashVisible());
+	Burst->AdvanceBurst(0.3f);
+	TestTrue(TEXT("Burst removes itself"), !IsValid(Burst) || Burst->IsActorBeingDestroyed());
+
+	// Pooled reuse shows the enemy again.
+	UEnemyPoolSubsystem* Pool = W.World->GetSubsystem<UEnemyPoolSubsystem>();
+	Pool->Prewarm(AShardling::StaticClass(), 1);
+	AShardling* Pooled = Cast<AShardling>(Pool->Acquire(AShardling::StaticClass(), FTransform(FVector(900.f, 0.f, 0.f))));
+	if (!Pooled) return false;
+	Pooled->Kill();
+	Run(Pooled, 1.f);
+	AShardling* Again = Cast<AShardling>(Pool->Acquire(AShardling::StaticClass(), FTransform(FVector(900.f, 0.f, 0.f))));
+	TestTrue(TEXT("Reused enemy is visible again"), Again == Pooled && !Again->IsHidden());
 	return true;
 }
 
