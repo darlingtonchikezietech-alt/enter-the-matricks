@@ -55,6 +55,8 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "ETM|Menu") TObjectPtr<USceneComponent> Root;
 	UPROPERTY(VisibleAnywhere, Category = "ETM|Menu") TObjectPtr<UTextRenderComponent> TitleText;
 	UPROPERTY(VisibleAnywhere, Category = "ETM|Menu") TObjectPtr<UTextRenderComponent> BodyText;
+	/** Unlit, so text reads the same however the scene is lit (T-0020: lit text turned black when the light moved). */
+	UPROPERTY(EditAnywhere, Category = "ETM|Menu") TObjectPtr<UMaterialInterface> TextMaterial;
 
 private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UBoxComponent>> ButtonBoxes;

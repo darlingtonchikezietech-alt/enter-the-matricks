@@ -66,8 +66,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "ETM|Flow") FETMMissionResult GetCurrentRun() const;
 	UFUNCTION(BlueprintPure, Category = "ETM|Flow") int32 GetCampaignScore() const;
 
-	/** Map loaded for each campaign level. Until the real arenas exist (T-0020, T-0027) both are the sandbox. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ETM|Flow") TArray<FString> LevelMaps = { TEXT("/Engine/Maps/Entry"), TEXT("/Engine/Maps/Entry") };
+	/** Map loaded for each campaign level: the Level 1 greybox (T-0020); Level 2 is the sandbox until T-0027. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ETM|Flow") TArray<FString> LevelMaps = { TEXT("/Game/ETM/Maps/L1_Breach"), TEXT("/Engine/Maps/Entry") };
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ETM|Flow") FString TitleMap = TEXT("/Engine/Maps/Entry");
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ETM|Flow") FString PracticeMap = TEXT("/Engine/Maps/Entry");
 	/** Length of the fade-out and of the fade-in (bible section 11: relocation through fade-out, load, fade-in). */

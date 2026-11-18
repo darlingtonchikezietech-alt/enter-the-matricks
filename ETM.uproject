@@ -9,7 +9,8 @@
 	"Plugins": [
 		{ "Name": "OpenXR", "Enabled": true },
 		{ "Name": "XRBase", "Enabled": true },
-		{ "Name": "EnhancedInput", "Enabled": true }
+		{ "Name": "EnhancedInput", "Enabled": true },
+		{ "Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": [ "Editor" ] }
 	],
 	"TargetPlatforms": [ "Android", "Windows" ]
 }

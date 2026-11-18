@@ -18,6 +18,10 @@
 // ignored: it put the rig at an arbitrary height.
 // Failure retries by itself after 3 s (no failure screen yet).
 // No .umap is needed. Other maps and automated tests never get the range unless BuildSandbox is called.
+//
+// Arena maps (any map with a mission objective and an encounter director, e.g. L1_Breach from T-0020) are
+// played as they are: the rig goes to the map's player start, the map's first directional light does the
+// fades, and the director plays its own phases, or the stand-in waves while it has none (until T-0026).
 #pragma once
 
 #include "CoreMinimal.h"
@@ -51,6 +55,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ETM|Sandbox") void BuildSandbox();
 	/** True if this world should get the range automatically. */
 	UFUNCTION(BlueprintPure, Category = "ETM|Sandbox") bool ShouldBuildSandbox() const;
+	/** True if the map is an arena: it has its own mission objective and encounter director. */
+	UFUNCTION(BlueprintPure, Category = "ETM|Sandbox") bool HasArena() const;
+	/** Plays the map's own arena for the flow's current stage. Runs by itself on arena maps. */
+	UFUNCTION(BlueprintCallable, Category = "ETM|Sandbox") void SetupArena();
+	UFUNCTION(BlueprintPure, Category = "ETM|Sandbox") bool IsArena() const { return bArena; }
+	/** Where the rig sits: the range's mount, or the arena's player start. */
+	UFUNCTION(BlueprintPure, Category = "ETM|Sandbox") FTransform GetRigMount() const { return RigMount; }
 
 	/** The campaign flow this world follows. Found on the game instance at StartPlay; tests set their own. Null = practice only. */
 	UFUNCTION(BlueprintCallable, Category = "ETM|Sandbox") void SetFlow(UETMCampaignFlow* InFlow);
@@ -109,5 +120,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<AETMMenuPanel> Panel;
 	UPROPERTY(Transient) TArray<TObjectPtr<AActor>> SandboxActors;
 	FTimerHandle RetryTimer;
+	FTransform RigMount = FTransform::Identity;
 	bool bBuilt = false;
+	bool bArena = false;
 };
