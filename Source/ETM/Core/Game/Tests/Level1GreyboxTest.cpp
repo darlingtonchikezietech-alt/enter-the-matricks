@@ -129,7 +129,7 @@ bool FETMLevel1LayoutTest::RunTest(const FString&)
 		FString Blocker;
 		for (const AStaticMeshActor* Mesh : Meshes)
 		{
-			if (SegmentHitsMesh(Mesh, Eye, Targets[i])) { Blocker = Mesh->GetActorLabel(); break; }
+			if (SegmentHitsMesh(Mesh, Eye, Targets[i])) { Blocker = Mesh->GetName(); break; }
 		}
 		TestTrue(FString::Printf(TEXT("Clear sight line to target %d (blocked by '%s')"), i, *Blocker), Blocker.IsEmpty());
 	}
