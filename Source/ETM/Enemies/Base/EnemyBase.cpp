@@ -1,5 +1,6 @@
 #include "Enemies/Base/EnemyBase.h"
 #include "Enemies/Base/AttackTokenSubsystem.h"
+#include "Enemies/Base/EnemyDeathBurst.h"
 #include "ETM.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
@@ -78,6 +79,16 @@ bool AEnemyBase::SetState(EEnemyState NewState)
 		SetInPlay(true);
 		break;
 	case EEnemyState::Dying:
+		if (bExplodeOnDeath && GetWorld())
+		{
+			// Gone in a small explosion the size of the enemy's body (T-0058). Visible again when the pool
+			// reuses it. Colliding parts only, so cosmetic pieces such as a drone's aiming line do not count.
+			FVector Centre, Extent;
+			GetActorBounds(true, Centre, Extent);
+			const float Size = Extent.IsNearlyZero() ? 100.f : 2.f * Extent.GetMax();
+			AEnemyDeathBurst::SpawnBurst(GetWorld(), Extent.IsNearlyZero() ? GetActorLocation() : Centre, Size, DeathBurstColor);
+			SetActorHiddenInGame(true);
+		}
 		SetActorEnableCollision(false); // shots pass through wreckage; debris has no gameplay collision
 		break;
 	case EEnemyState::Inactive:

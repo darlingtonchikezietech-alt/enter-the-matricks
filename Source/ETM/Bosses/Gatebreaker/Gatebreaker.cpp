@@ -32,6 +32,7 @@ AGatebreaker::AGatebreaker()
 	SpawnDuration = 3.f;        // tears open the blast door and locks in; no attacks meanwhile
 	StaggerDuration = 1.f;      // the interrupted-furnace recoil
 	DeathDuration = 4.f;        // collapse
+	bExplodeOnDeath = false;    // the collapse is its own death sequence
 	StaggerDamageThreshold = 0.f;
 	bUsesAttackToken = false;   // the boss always gets its attack; the boss phase sets adds to 1 token (see header)
 	// Keep the actor after death (parked, not destroyed): a failure after the boss dies retries the boss

@@ -3,6 +3,9 @@
 // shoot it or brace before the burst). Owned by T-0014.
 //
 // Flies straight to its hover point, faces the rig, then repeats: telegraph, burst, cooldown.
+// Once there it never stands still: it drifts around the hover point inside a zone, mostly sideways and
+// up and down as the rig sees it, slow enough to track and shoot, slower still during the warning
+// (owner headset test, T-0058). Each drone has its own pattern, so a group weaves around each other.
 // The hover point and attack tokens come from the encounter director (T-0017).
 #pragma once
 
@@ -47,6 +50,17 @@ public:
 	/** Within this distance of the hover point the drone counts as arrived and may attack. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone", meta = (ClampMin = "0")) float ArriveTolerance = 20.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone", meta = (ClampMin = "0")) float TonePitchRise = 1.f;
+	/** Half-size of the drift zone around the hover point, in the rig's view: X toward/away, Y sideways, Z up/down (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone") FVector DriftHalfExtent = FVector(120.f, 300.f, 130.f);
+	/** How fast the drift pattern runs (1 = about one sideways sweep every 7 s). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone", meta = (ClampMin = "0")) float DriftRate = 1.f;
+	/** Drift rate during the warning, so the aiming line stays readable. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone", meta = (ClampMin = "0", ClampMax = "1")) float DriftRateWhileWarning = 0.35f;
+	/** The drift grows from nothing over this long after arriving, so the drone eases into it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone", meta = (ClampMin = "0.01")) float DriftRampSeconds = 2.f;
+	/** Offset from the hover point the drift wants right now. */
+	UFUNCTION(BlueprintPure, Category = "ETM|NeedleDrone") FVector GetDriftOffset() const;
+	UFUNCTION(BlueprintPure, Category = "ETM|NeedleDrone") bool HasArrived() const { return bArrived; }
 	/** Plays during the warning, with its pitch rising (bible: "rising tone"). Assign a sound asset; none ships yet. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|NeedleDrone") TObjectPtr<USoundBase> TelegraphSound;
 
@@ -68,4 +82,8 @@ private:
 	FVector HoverLocation = FVector::ZeroVector;
 	float CooldownRemaining = 0.f;
 	bool bHoverAssigned = false;
+	bool bArrived = false;
+	float DriftTime = 0.f;
+	FVector DriftPhase = FVector::ZeroVector;
+	void MoveToward(const FVector& Goal, float DeltaSeconds);
 };

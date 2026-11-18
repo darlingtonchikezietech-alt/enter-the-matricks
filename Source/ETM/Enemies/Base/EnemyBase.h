@@ -84,6 +84,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float StaggerDuration = 1.0f;
 	/** Length of the destruction sequence. Collision is off for all of it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float DeathDuration = 0.75f;
+	/** On death the enemy vanishes in a small explosion (AEnemyDeathBurst, T-0058). Bosses turn this off for their own collapse. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy") bool bExplodeOnDeath = true;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy") FLinearColor DeathBurstColor = FLinearColor(1.f, 0.55f, 0.18f);
 	/** Body damage within StaggerWindow that staggers the enemy (concentrated fire). 0 disables it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float StaggerDamageThreshold = 0.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Enemy", meta = (ClampMin = "0")) float StaggerWindow = 1.0f;
