@@ -5,6 +5,8 @@
 #include "Engine/DamageEvents.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Materials/MaterialInterface.h"
+#include "UObject/ConstructorHelpers.h"
 
 namespace
 {
@@ -16,9 +18,10 @@ namespace
 	constexpr float ButtonHeight = 16.f;
 	constexpr float ButtonGap = 14.f;
 
-	UTextRenderComponent* MakeText(AActor* Owner, USceneComponent* Parent, float Size, const FColor& Color)
+	UTextRenderComponent* MakeText(AActor* Owner, USceneComponent* Parent, float Size, const FColor& Color, UMaterialInterface* Material)
 	{
 		UTextRenderComponent* Text = NewObject<UTextRenderComponent>(Owner);
+		if (Material) Text->SetTextMaterial(Material);
 		Text->SetupAttachment(Parent);
 		Text->SetHorizontalAlignment(EHTA_Center);
 		Text->SetVerticalAlignment(EVRTA_TextCenter);
@@ -34,6 +37,10 @@ namespace
 AETMMenuPanel::AETMMenuPanel()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	// A hard reference, so the material is cooked into the build.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> UnlitText(TEXT("/Engine/EngineMaterials/UnlitText.UnlitText"));
+	TextMaterial = UnlitText.Object;
+
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	RootComponent = Root;
 
@@ -46,6 +53,7 @@ AETMMenuPanel::AETMMenuPanel()
 	TitleText->SetTextRenderColor(FColor(255, 214, 90));
 	TitleText->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	TitleText->SetCastShadow(false);
+	if (TextMaterial) TitleText->SetTextMaterial(TextMaterial);
 
 	BodyText = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Body"));
 	BodyText->SetupAttachment(Root);
@@ -55,6 +63,7 @@ AETMMenuPanel::AETMMenuPanel()
 	BodyText->SetTextRenderColor(FColor(220, 235, 245));
 	BodyText->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BodyText->SetCastShadow(false);
+	if (TextMaterial) BodyText->SetTextMaterial(TextMaterial);
 }
 
 void AETMMenuPanel::Setup(const FText& Title, const FString& Body, const TArray<FETMMenuButton>& Buttons)
@@ -99,7 +108,7 @@ void AETMMenuPanel::Setup(const FText& Title, const FString& Body, const TArray<
 		Plate->SetCastShadow(false);
 		Plate->RegisterComponent();
 
-		UTextRenderComponent* Label = MakeText(this, Box, 6.f, FColor(15, 25, 35));
+		UTextRenderComponent* Label = MakeText(this, Box, 6.f, FColor(15, 25, 35), TextMaterial);
 		Label->SetRelativeLocation(FVector(3.5f, 0.f, 0.f));
 		Label->SetText(Buttons[i].Label);
 

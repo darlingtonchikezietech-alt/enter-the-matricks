@@ -18,6 +18,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/TargetPoint.h"
+#include "GameFramework/PlayerStart.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
@@ -101,6 +102,10 @@ void AETMSandboxGameMode::StartPlay()
 	{
 		BuildSandbox();
 	}
+	else if (HasArena())
+	{
+		SetupArena();
+	}
 	// A transition was waiting for this world: start the fade-in.
 	if (Flow) Flow->NotifyWorldReady(GetWorld());
 }
@@ -140,12 +145,11 @@ APawn* AETMSandboxGameMode::FindRigPawn() const
 void AETMSandboxGameMode::PlaceRigOnRange(APawn* Rig) const
 {
 	if (!Rig) return;
-	const FVector Mount(0.f, 0.f, RigBaseHeight);
-	if (!Rig->GetActorLocation().Equals(Mount, 1.f) || !Rig->GetActorRotation().IsNearlyZero(0.1f))
+	if (!Rig->GetActorLocation().Equals(RigMount.GetLocation(), 1.f) || !Rig->GetActorRotation().Equals(RigMount.Rotator(), 0.1f))
 	{
-		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to its mount."), *Rig->GetActorLocation().ToCompactString());
+		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to its mount at %s."), *Rig->GetActorLocation().ToCompactString(), *RigMount.GetLocation().ToCompactString());
 	}
-	Rig->SetActorLocationAndRotation(Mount, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
+	Rig->SetActorLocationAndRotation(RigMount.GetLocation(), RigMount.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 float AETMSandboxGameMode::GetCurrentLightIntensity() const
@@ -191,6 +195,7 @@ void AETMSandboxGameMode::BuildSandbox()
 	bBuilt = true;
 	const EETMFlowStage Stage = Flow ? Flow->GetStageToBuild() : EETMFlowStage::Practice;
 	UE_LOG(LogETM, Display, TEXT("Building the sandbox range for flow stage %d (T-0053, T-0031)."), static_cast<int32>(Stage));
+	RigMount = FTransform(FVector(0.f, 0.f, RigBaseHeight));
 	PlaceRigOnRange(FindRigPawn());
 	BuildRange();
 
@@ -225,11 +230,63 @@ void AETMSandboxGameMode::BuildSandbox()
 	}
 }
 
+bool AETMSandboxGameMode::HasArena() const
+{
+	if (!GetWorld()) return false;
+	TActorIterator<AMissionObjective> FirstObjective(GetWorld());
+	TActorIterator<AEncounterDirector> FirstDirector(GetWorld());
+	return FirstObjective && FirstDirector;
+}
+
+void AETMSandboxGameMode::SetupArena()
+{
+	if (bBuilt || !GetWorld() || !HasArena()) return;
+	bBuilt = true;
+	bArena = true;
+	const EETMFlowStage Stage = Flow ? Flow->GetStageToBuild() : EETMFlowStage::Practice;
+	UE_LOG(LogETM, Display, TEXT("Playing arena %s for flow stage %d (T-0020)."), *UGameplayStatics::GetCurrentLevelName(GetWorld()), static_cast<int32>(Stage));
+
+	TActorIterator<AMissionObjective> FirstObjective(GetWorld());
+	TActorIterator<AEncounterDirector> FirstDirector(GetWorld());
+	Objective = *FirstObjective;
+	Director = *FirstDirector;
+
+	// The map's first directional light does the fades, from the intensity the map gave it.
+	TActorIterator<ADirectionalLight> FirstLight(GetWorld());
+	if (FirstLight)
+	{
+		Sun = *FirstLight;
+		LightIntensity = Sun->GetLightComponent()->Intensity;
+		Sun->GetLightComponent()->SetIntensity(GetCurrentLightIntensity());
+	}
+
+	// The rig sits exactly on the map's player start (its base, not a capsule centre).
+	TActorIterator<APlayerStart> FirstStart(GetWorld());
+	RigMount = FirstStart ? FTransform(FRotator(0.f, FirstStart->GetActorRotation().Yaw, 0.f), FirstStart->GetActorLocation())
+		: FTransform(FVector(0.f, 0.f, RigBaseHeight));
+	PlaceRigOnRange(FindRigPawn());
+	Director->RigActor = FindRigPawn();
+
+	if (Stage == EETMFlowStage::Title)
+	{
+		ShowPanel(EETMFlowStage::Title);
+		return;
+	}
+	// The map's own schedule, or the stand-in waves until it has one (T-0026, T-0029).
+	const int32 LevelIndex = Flow ? Flow->GetLevelIndex() : 0;
+	StartEncounter(Director->Phases.Num() > 0 ? Director->Phases : MakeLevelPhases(LevelIndex));
+	if (Stage == EETMFlowStage::Level && Flow)
+	{
+		Director->OnEncounterComplete.AddUniqueDynamic(this, &AETMSandboxGameMode::HandleEncounterComplete);
+		Flow->BeginLevel(GetWorld(), Cast<AXRSeatedRigPawn>(FindRigPawn()));
+	}
+}
+
 void AETMSandboxGameMode::BuildRange()
 {
 	// Light: one movable directional light, from above and behind the rig so everything facing the player
 	// (enemies, panels, the objective) is lit. No shadows.
-	Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 200.f, 0.f));
+	Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 20.f, 0.f));
 	if (Sun)
 	{
 		ULightComponent* Light = Sun->GetLightComponent();
