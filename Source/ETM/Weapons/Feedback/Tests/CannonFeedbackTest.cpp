@@ -121,8 +121,8 @@ bool FETMFeedbackShotTest::RunTest(const FString&)
 	W.Feedback->GetTracerSegment(0, Tail, Head);
 	TestTrue(TEXT("Head reaches the impact at half its life"), Head.Equals(W.Cannon->GetLastShot().EndLocation, 30.f));
 
-	// Everything settles well before the next shot (0.25 s at 4 shots/s).
-	W.Animate(0.2f);
+	// Everything settles after a short pause in firing.
+	W.Animate(0.3f);
 	TestTrue(TEXT("Recoil settles"), W.Feedback->GetRecoilOffset().IsNearlyZero(0.01f));
 	TestFalse(TEXT("Muzzle flash gone"), W.Feedback->IsMuzzleFlashVisible());
 	TestEqual(TEXT("Tracer gone"), W.Feedback->GetActiveTracerCount(), 0);
@@ -158,6 +158,25 @@ bool FETMFeedbackSettingsTest::RunTest(const FString&)
 	W.Animate(0.04f);
 	TestFalse(TEXT("Reduced muzzle flash is shorter"), W.Feedback->IsMuzzleFlashVisible());
 	W.Animate(0.3f);
+
+	// Rapid fire (10 shots/s): the muzzle flash shows on the first shot and then at most every 0.25 s, never
+	// on every shot, and it sits 40 cm past the muzzle, away from the face (owner headset test, T-0056).
+	W.Feedback->bReducedFlash = false;
+	W.Cannon->ResetHeat();
+	const int32 FlashesBefore = W.Feedback->GetMuzzleFlashesShown();
+	const int32 ShotsBefore = W.Cannon->GetShotsFired();
+	W.Cannon->SetTriggerHeld(true);
+	for (float T = 0.f; T < 3.f; T += Frame72)
+	{
+		W.Cannon->AdvanceCannon(Frame72);
+		W.Feedback->AdvanceFeedback(Frame72);
+	}
+	W.Cannon->SetTriggerHeld(false);
+	const int32 Shots = W.Cannon->GetShotsFired() - ShotsBefore;
+	const int32 Flashes = W.Feedback->GetMuzzleFlashesShown() - FlashesBefore;
+	TestTrue(FString::Printf(TEXT("Rapid fire: %d flashes for %d shots"), Flashes, Shots), Shots >= 28 && Flashes >= 8 && Flashes * 2 < Shots);
+	TestTrue(TEXT("Flash sits well past the muzzle"), W.Feedback->GetMuzzleFlashOffset().X >= W.Cannon->MuzzleOffset.X + 30.f);
+	W.Animate(0.5f);
 
 	// Overheat: one long, full-strength buzz (scaled by the setting).
 	W.Feedback->HapticStrength = 1.f;

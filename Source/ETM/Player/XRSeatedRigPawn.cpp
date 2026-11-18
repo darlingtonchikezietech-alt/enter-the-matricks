@@ -46,13 +46,14 @@ AXRSeatedRigPawn::AXRSeatedRigPawn()
 	RigFrame->SetupAttachment(RootComponent);
 
 	// Prototype mount positions (cm, relative to rig root at seat height). Tune in T-0008 blockout.
+	// 65 cm out to each side (was 45) so the cannons read as being at the player's sides (owner, T-0056).
 	LeftMount = CreateDefaultSubobject<USceneComponent>(TEXT("LeftMount"));
 	LeftMount->SetupAttachment(RigFrame);
-	LeftMount->SetRelativeLocation(FVector(20.f, -45.f, 95.f));
+	LeftMount->SetRelativeLocation(FVector(15.f, -65.f, 95.f));
 
 	RightMount = CreateDefaultSubobject<USceneComponent>(TEXT("RightMount"));
 	RightMount->SetupAttachment(RigFrame);
-	RightMount->SetRelativeLocation(FVector(20.f, 45.f, 95.f));
+	RightMount->SetRelativeLocation(FVector(15.f, 65.f, 95.f));
 
 	LeftCannon = CreateDefaultSubobject<UCannonComponent>(TEXT("LeftCannon"));
 	LeftCannon->SetupAttachment(LeftMount);

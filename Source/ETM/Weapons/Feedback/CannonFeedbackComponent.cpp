@@ -65,6 +65,9 @@ void UCannonFeedbackComponent::BeginPlay()
 	{
 		DischargeInstance = UMaterialInstanceDynamic::Create(DischargeMaterial, this);
 		DischargeInstance->SetVectorParameterValue(TEXT("Color"), DischargeColor * 4.f); // over 1 so it reads as light
+		// The muzzle flash is close to the face: dimmer than tracers and impacts (T-0056).
+		MuzzleFlashInstance = UMaterialInstanceDynamic::Create(DischargeMaterial, this);
+		MuzzleFlashInstance->SetVectorParameterValue(TEXT("Color"), DischargeColor * MuzzleFlashBrightness);
 	}
 
 	// Everything is built once here; shots only reuse it.
@@ -79,10 +82,10 @@ void UCannonFeedbackComponent::BeginPlay()
 	Barrel->SetRelativeScale3D(FVector(0.16f, 0.16f, FMath::Max(Muzzle.X, 1.f) / 100.f));
 
 	MuzzleFlash = MakeVisual(TEXT("MuzzleFlash"), FlashMesh, RecoilPivot, false);
-	MuzzleFlash->SetRelativeLocation(Muzzle + FVector(15.f, 0.f, 0.f));
+	MuzzleFlash->SetRelativeLocation(GetMuzzleFlashOffset());
 	MuzzleFlash->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f)); // directional: points down the barrel
 	MuzzleFlash->SetVisibility(false);
-	if (DischargeInstance) MuzzleFlash->SetMaterial(0, DischargeInstance);
+	if (MuzzleFlashInstance) MuzzleFlash->SetMaterial(0, MuzzleFlashInstance);
 
 	Tracers.SetNum(TracerPoolSize);
 	for (int32 Index = 0; Index < Tracers.Num(); ++Index)
@@ -121,10 +124,13 @@ void UCannonFeedbackComponent::HandleShot(const FCannonShot& Shot)
 	RecoilTime = 0.f;
 
 	// 2: muzzle discharge.
-	FlashAge = 0.f;
-	if (MuzzleFlash)
+	// Not every shot: at 10 shots/s that strobes beside the eyes (T-0056).
+	if (MuzzleFlash && FlashCooldown <= 0.f)
 	{
-		const float Size = bReducedFlash ? 0.35f : 0.7f;
+		FlashAge = 0.f;
+		FlashCooldown = MuzzleFlashMinInterval;
+		++MuzzleFlashesShown;
+		const float Size = MuzzleFlashScale * (bReducedFlash ? 0.5f : 1.f);
 		MuzzleFlash->SetRelativeScale3D(FVector(Size, Size, Size * 0.6f));
 		MuzzleFlash->SetVisibility(true);
 	}
@@ -252,6 +258,11 @@ void UCannonFeedbackComponent::AdvanceFeedback(float DeltaTime)
 		if (T >= 1.f) RecoilTime = -1.f; else bBusy = true;
 	}
 
+	if (FlashCooldown > 0.f)
+	{
+		FlashCooldown -= DeltaTime;
+		bBusy = true;
+	}
 	if (FlashAge >= 0.f)
 	{
 		FlashAge += DeltaTime;
@@ -320,6 +331,12 @@ void UCannonFeedbackComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 FVector UCannonFeedbackComponent::GetRecoilOffset() const
 {
 	return RecoilPivot ? RecoilPivot->GetRelativeLocation() : FVector::ZeroVector;
+}
+
+FVector UCannonFeedbackComponent::GetMuzzleFlashOffset() const
+{
+	const FVector Muzzle = Cannon ? Cannon->MuzzleOffset : FVector(80.f, 0.f, 0.f);
+	return Muzzle + FVector(MuzzleFlashForwardCm, 0.f, 0.f);
 }
 
 bool UCannonFeedbackComponent::IsMuzzleFlashVisible() const
