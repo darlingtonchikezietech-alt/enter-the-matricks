@@ -215,7 +215,7 @@ void AETMSandboxGameMode::BuildRange()
 {
 	// Light: one movable directional light, from above and behind the rig so everything facing the player
 	// (enemies, panels, the objective) is lit. No shadows.
-	Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 20.f, 0.f));
+	Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 200.f, 0.f));
 	if (Sun)
 	{
 		ULightComponent* Light = Sun->GetLightComponent();
