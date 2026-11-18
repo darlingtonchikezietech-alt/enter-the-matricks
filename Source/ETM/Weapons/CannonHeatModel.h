@@ -1,7 +1,7 @@
 // CannonHeatModel.h
 // Pure C++ (no Unreal types) so it can be unit-tested outside the engine and kept
 // in lock-step with enter-the-matricks-tracker/tools/balance_sim.py.
-// Spec: PRODUCT_BIBLE.md section 5, patch P-01.
+// Spec: PRODUCT_BIBLE.md section 5, patches P-01 and P-34.
 #pragma once
 
 #include <algorithm>
@@ -10,9 +10,9 @@ namespace ETM
 {
 	struct FHeatTuning
 	{
-		float FireRate = 4.0f;              // shots per second
+		float FireRate = 10.0f;             // shots per second (P-34)
 		float HeatCapacity = 100.0f;
-		float HeatPerShot = 9.0f;
+		float HeatPerShot = 1.0f;           // P-34: about 100 shots from cold to overheat
 		float PassiveCooling = 18.0f;       // per second
 		float PassiveCoolingDelay = 0.4f;   // seconds without firing before passive cooling starts
 		float VentCooling = 40.0f;          // per second; REPLACES passive (not additive)
@@ -36,7 +36,10 @@ namespace ETM
 	 */
 	inline bool StepHeat(FHeatState& S, const FHeatTuning& T, float Dt, bool bTriggerHeld, bool bVentHeld)
 	{
-		S.FireCooldown = std::max(0.0f, S.FireCooldown - Dt);
+		// The cooldown may go below zero by at most one step, and that remainder is carried into the
+		// next shot's cooldown (T-0043). Without the carry, frame-stepped fire slips up to one sub-step
+		// per shot, which at 10 shots/s costs several percent of the fire rate.
+		S.FireCooldown = std::max(-Dt, S.FireCooldown - Dt);
 		S.TimeSinceLastShot += Dt;
 
 		bool bVenting = bVentHeld && (!S.bOverheated || T.bAllowVentWhileOverheated);
@@ -60,7 +63,7 @@ namespace ETM
 		{
 			S.Heat += T.HeatPerShot;
 			S.TimeSinceLastShot = 0.0f;
-			S.FireCooldown = 1.0f / T.FireRate;
+			S.FireCooldown += 1.0f / T.FireRate;
 			if (S.Heat >= T.HeatCapacity) // the shot that crosses the cap still fires (P-01)
 			{
 				S.Heat = T.HeatCapacity;

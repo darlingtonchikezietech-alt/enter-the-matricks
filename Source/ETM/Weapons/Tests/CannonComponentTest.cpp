@@ -131,7 +131,7 @@ bool FETMCannonIndependenceTest::RunTest(const FString&)
 	Left->SetAimDirection(FRotator(0.f, -30.f, 0.f).Vector());
 	Right->SetAimDirection(FRotator(10.f, 30.f, 0.f).Vector());
 	Left->SetTriggerHeld(true);
-	for (float T = 0.f; T < 3.f; T += Frame72)
+	for (float T = 0.f; T < 11.f; T += Frame72)
 	{
 		Left->AdvanceCannon(Frame72);
 		Right->AdvanceCannon(Frame72);
@@ -139,7 +139,7 @@ bool FETMCannonIndependenceTest::RunTest(const FString&)
 
 	TestTrue(TEXT("Left barrel reached its own aim"), Left->GetRelativeRotation().Equals(FRotator(0.f, -30.f, 0.f), 0.1f));
 	TestTrue(TEXT("Right barrel reached its own aim"), Right->GetRelativeRotation().Equals(FRotator(10.f, 30.f, 0.f), 0.1f));
-	TestEqual(TEXT("Left fired 12 shots before locking (P-01)"), Left->GetShotsFired(), 12);
+	TestEqual(TEXT("Left fired 100 shots before locking (P-01, P-34)"), Left->GetShotsFired(), 100);
 	TestTrue(TEXT("Left is overheated"), Left->IsOverheated());
 	TestEqual(TEXT("Right never fired"), Right->GetShotsFired(), 0);
 	TestEqual(TEXT("Right is cold"), Right->GetHeatNormalized(), 0.f);
@@ -166,7 +166,7 @@ bool FETMCannonVentLockTest::RunTest(const FString&)
 	for (UCannonComponent* Cannon : { Vented, Passive })
 	{
 		Cannon->SetTriggerHeld(true);
-		Advance(Cannon, 3.f);
+		Advance(Cannon, 11.f); // 100 shots to lock (P-34)
 		Cannon->SetTriggerHeld(false);
 	}
 	TestTrue(TEXT("Both cannons are locked"), Vented->IsOverheated() && Passive->IsOverheated());
@@ -212,13 +212,13 @@ bool FETMCannonDamageTest::RunTest(const FString&)
 	FireOnce(Cannon);
 	TestFalse(TEXT("Empty lane is a miss"), Cannon->GetLastShot().bHit);
 	TestTrue(TEXT("Trace ends 60 m from the muzzle"), FMath::IsNearlyEqual(FVector::Dist(Cannon->GetLastShot().MuzzleLocation, Cannon->GetLastShot().EndLocation), 6000.0, 0.1));
-	TestTrue(TEXT("Shot starts at the muzzle, not the barrel root"), Cannon->GetLastShot().MuzzleLocation.Equals(FVector(120.f, 0.f, 100.f), 0.1f));
+	TestTrue(TEXT("Shot starts at the muzzle, not the barrel root"), Cannon->GetLastShot().MuzzleLocation.Equals(FVector(80.f, 0.f, 100.f), 0.1f));
 
 	struct FCase { FName Tag; float ExpectedDamage; bool bWeakPoint; const TCHAR* Name; };
 	const FCase Cases[] = {
-		{ NAME_None,           40.f, false, TEXT("plain hull x1") },
-		{ ETMTags::WeakPoint,  80.f, true,  TEXT("weak point x2") },
-		{ ETMTags::Armor,      10.f, false, TEXT("armor x0.25") },
+		{ NAME_None,           25.f, false, TEXT("plain hull x1") },
+		{ ETMTags::WeakPoint,  50.f, true,  TEXT("weak point x2") },
+		{ ETMTags::Armor,     6.25f, false, TEXT("armor x0.25") },
 		{ ETMTags::Immune,      0.f, false, TEXT("immune x0") },
 	};
 	for (const FCase& Case : Cases)
@@ -292,7 +292,7 @@ bool FETMCannonObstructionTest::RunTest(const FString&)
 	Strut->DestroyComponent();
 
 	// A wall that is not part of the rig, with the muzzle poked through it: still no shot beyond.
-	AActor* Wall = W.SpawnActorAt(FVector(90.f, 0.f, 100.f));
+	AActor* Wall = W.SpawnActorAt(FVector(70.f, 0.f, 100.f)); // just behind the 80 cm muzzle
 	W.AddBox(Wall, FVector::ZeroVector, FVector(5.f, 200.f, 200.f));
 	Cannon->ResetHeat();
 	FireOnce(Cannon);
@@ -303,7 +303,7 @@ bool FETMCannonObstructionTest::RunTest(const FString&)
 	// With every obstruction gone the same shot lands again.
 	Cannon->ResetHeat();
 	FireOnce(Cannon);
-	TestTrue(TEXT("Clear lane hits again"), Cannon->GetLastShot().bHit && Cannon->GetLastShot().Damage == 40.f);
+	TestTrue(TEXT("Clear lane hits again"), Cannon->GetLastShot().bHit && Cannon->GetLastShot().Damage == 25.f);
 	return true;
 }
 

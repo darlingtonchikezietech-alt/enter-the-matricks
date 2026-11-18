@@ -72,7 +72,7 @@ void UCannonFeedbackComponent::BeginPlay()
 	RecoilPivot->SetupAttachment(this);
 	RecoilPivot->RegisterComponent();
 
-	const FVector Muzzle = Cannon ? Cannon->MuzzleOffset : FVector(120.f, 0.f, 0.f);
+	const FVector Muzzle = Cannon ? Cannon->MuzzleOffset : FVector(80.f, 0.f, 0.f);
 	Barrel = MakeVisual(TEXT("BarrelVisual"), BarrelMesh, RecoilPivot, false);
 	Barrel->SetRelativeLocation(Muzzle * 0.5f);
 	Barrel->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));

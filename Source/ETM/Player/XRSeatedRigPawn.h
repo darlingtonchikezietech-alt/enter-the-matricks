@@ -62,7 +62,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "ETM|Calibration") FOnRigCalibrationChanged OnCalibrationChanged;
 
 	/** Where the seated player's eyes belong, in rig space (cm). Tune with the T-0008 blockout. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Calibration") FVector DesignEyeLocation = FVector(0.f, 0.f, 120.f);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Calibration") FVector DesignEyeLocation = FVector(0.f, 0.f, 110.f); // 10 cm lower after the owner's headset test (T-0055)
 	/** Calibrate the seat automatically on the first frame with a tracked headset. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Calibration") bool bAutoCalibrateOnStart = true;
 

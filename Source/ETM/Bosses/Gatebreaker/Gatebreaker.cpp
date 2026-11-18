@@ -43,7 +43,7 @@ AGatebreaker::AGatebreaker()
 		MakeBossPart(NodeLeftPart, 600.f, false),
 		MakeBossPart(NodeRightPart, 600.f, false),
 		MakeBossPart(ChamberPart, 240.f, true),
-		MakeBossPart(CorePart, 3000.f, false),
+		MakeBossPart(CorePart, 6500.f, false), // P-34
 	};
 
 	using namespace ETMPlaceholder;

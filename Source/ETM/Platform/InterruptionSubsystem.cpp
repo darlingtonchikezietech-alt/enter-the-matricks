@@ -127,18 +127,19 @@ AXRSeatedRigPawn* UETMInterruptionSubsystem::FindRig() const
 {
 	UWorld* World = GetWorld();
 	if (!World) return nullptr;
-	for (TActorIterator<AXRSeatedRigPawn> It(World); It; ++It) return *It;
-	return nullptr;
+	// First rig in the world. (No one-pass loop: Clang rejects those on Android, T-0054.)
+	TActorIterator<AXRSeatedRigPawn> First(World);
+	return First ? *First : nullptr;
 }
 
 void UETMInterruptionSubsystem::BindMenuButton()
 {
 	if (BoundController.IsValid() || !GetWorld()) return;
-	for (TActorIterator<ARigPlayerController> It(GetWorld()); It; ++It)
+	TActorIterator<ARigPlayerController> First(GetWorld());
+	if (First)
 	{
-		It->OnPauseRequested.AddUniqueDynamic(this, &UETMInterruptionSubsystem::HandleMenuButton);
-		BoundController = *It;
-		return;
+		First->OnPauseRequested.AddUniqueDynamic(this, &UETMInterruptionSubsystem::HandleMenuButton);
+		BoundController = *First;
 	}
 }
 

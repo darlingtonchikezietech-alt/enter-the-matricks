@@ -127,7 +127,7 @@ bool FETMHudGaugesTest::RunTest(const FString&)
 
 	// Heat: left cannon fires until it locks; only the left housing changes, and the lock bracket appears.
 	W.Rig->SetTrigger(true, true);
-	for (int32 Frame = 0; Frame < 72 * 4 && !W.Rig->LeftCannon->IsOverheated(); ++Frame) W.Rig->LeftCannon->AdvanceCannon(Frame72);
+	for (int32 Frame = 0; Frame < 72 * 11 && !W.Rig->LeftCannon->IsOverheated(); ++Frame) W.Rig->LeftCannon->AdvanceCannon(Frame72);
 	W.Rig->SetTrigger(true, false);
 	TestTrue(TEXT("Left heat shown full"), W.Hud->GetShownHeat(true) > 0.95f);
 	TestEqual(TEXT("Right heat untouched"), W.Hud->GetShownHeat(false), 0.f);
