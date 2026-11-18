@@ -74,7 +74,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Placement") FVector ObjectiveLineLocation = FVector(125.f, 0.f, 82.f);
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Placement") FVector SecondaryLineLocation = FVector(125.f, 0.f, 50.f);
 	/** Heat bar on the housing, in cannon space: near the muzzle, where the player is already looking. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Placement") FVector HeatBarOnCannon = FVector(95.f, 0.f, 14.f);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Placement") FVector HeatBarOnCannon = FVector(63.f, 0.f, 14.f); // near the tip of the 80 cm barrel
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Placement") float MarkerHeightAboveSource = 120.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|HUD|Assets") TObjectPtr<UStaticMesh> BarMesh;

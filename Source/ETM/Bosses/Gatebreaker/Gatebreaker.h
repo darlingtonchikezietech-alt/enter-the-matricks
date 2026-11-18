@@ -2,8 +2,8 @@
 // Spec: bible section 9 "Gatebreaker boss specification", section 7 values, P-02, P-09, P-10. Owned by T-0021.
 //
 //   Phase 1 Anchor   - two shoulder shield nodes (600 HP) exposed in alternating windows; ends when both break.
-//   Phase 2 Breach   - after every furnace attack the core (3000 HP) opens: 6 s if interrupted, 4 s if it fired.
-//   Phase 3 Collapse - from core <= 30% (900 HP); the core keeps opening, and an artillery attack (35) joins the cycle.
+//   Phase 2 Breach   - after every furnace attack the core (6500 HP, P-34) opens: 6 s if interrupted, 4 s if it fired.
+//   Phase 3 Collapse - from core <= 30% (1950 HP); the core keeps opening, and an artillery attack (35) joins the cycle.
 //
 // In every phase a furnace attack charges for 2 s and hits the rig for 45 unless its charge chamber
 // (240 HP) is broken first. All targets are weak points (x2, P-02); everything else is immune armour.
@@ -82,7 +82,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Gatebreaker") float FurnaceChargeSeconds = 2.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Gatebreaker") float CoreWindowInterrupted = 6.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Gatebreaker") float CoreWindowFired = 4.f;
-	/** Phase 3 starts when the core is at or below this fraction (P-10: 30%, 900 HP). */
+	/** Phase 3 starts when the core is at or below this fraction (P-10: 30%, 1950 HP after P-34). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Gatebreaker") float CollapseThreshold = 0.3f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Gatebreaker") float ArtilleryDamage = 35.f;
 

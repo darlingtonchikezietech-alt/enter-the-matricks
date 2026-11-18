@@ -42,14 +42,14 @@ struct FCannonTuning
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float FireRate = 4.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float Damage = 40.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float FireRate = 10.0f; // P-34
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float Damage = 25.0f;   // P-34
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float WeakPointMultiplier = 2.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float ArmorMultiplier = 0.25f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Fire") float MaxRangeCm = 6000.0f; // P-18: 60 m, no falloff
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float HeatCapacity = 100.0f;
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float HeatPerShot = 9.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float HeatPerShot = 1.0f; // P-34
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float PassiveCooling = 18.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float PassiveCoolingDelay = 0.4f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Heat") float VentCooling = 40.0f;
@@ -121,7 +121,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Cannon") FCannonTuning Tuning;
 	/** Offset from this component's origin (the barrel root) to the muzzle, in local space. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Cannon") FVector MuzzleOffset = FVector(120.f, 0.f, 0.f);
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Cannon") FVector MuzzleOffset = FVector(80.f, 0.f, 0.f); // 80 cm barrels (owner headset test, T-0055)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Cannon") TEnumAsByte<ECollisionChannel> TraceChannel = ECC_Visibility;
 
 	UPROPERTY(BlueprintAssignable, Category = "ETM|Cannon") FOnCannonFired OnFired;

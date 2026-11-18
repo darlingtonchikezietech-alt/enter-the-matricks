@@ -21,7 +21,8 @@ namespace
 {
 	const EAutomationTestFlags ETMBossTestFlags = EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter;
 	const float Frame72 = 1.f / 72.f;
-	const float WeakPointShot = 80.f; // 40 base x2 (P-02)
+	const float WeakPointShot = 80.f; // a heavy hit, used to break parts quickly
+	const float CannonWeakPointShot = 50.f; // a real cannon shot on a weak point: 25 base x2 (P-02, P-34)
 
 	struct FTestWorld
 	{
@@ -115,7 +116,7 @@ bool FETMGatebreakerValuesTest::RunTest(const FString&)
 	W.Activate();
 	TestEqual(TEXT("Shield nodes 600 HP"), W.Boss->GetPartHealth(AGatebreaker::NodeLeftPart), 600.f);
 	TestEqual(TEXT("Charge chamber 240 HP"), W.Boss->GetPartHealth(AGatebreaker::ChamberPart), 240.f);
-	TestEqual(TEXT("Core 3000 HP"), W.Boss->GetCoreHealth(), 3000.f);
+	TestEqual(TEXT("Core 6500 HP (P-34)"), W.Boss->GetCoreHealth(), 6500.f);
 	TestEqual(TEXT("Furnace blast 45"), W.Boss->FurnaceDamage, 45.f);
 	TestEqual(TEXT("Furnace charge 2 s"), W.Boss->FurnaceChargeSeconds, 2.f);
 	TestEqual(TEXT("Artillery 35"), W.Boss->ArtilleryDamage, 35.f);
@@ -129,7 +130,7 @@ bool FETMGatebreakerValuesTest::RunTest(const FString&)
 	TestEqual(TEXT("Hull hit deals nothing"), W.Shoot(W.Boss->Hull, 500.f), 0.f);
 	TestEqual(TEXT("Closed core deals nothing"), W.Shoot(W.Boss->Core, 500.f), 0.f);
 	UGameplayStatics::ApplyDamage(W.Boss, 500.f, nullptr, W.RigActor, nullptr);
-	TestEqual(TEXT("Core untouched"), W.Boss->GetCoreHealth(), 3000.f);
+	TestEqual(TEXT("Core untouched"), W.Boss->GetCoreHealth(), 6500.f);
 	TestEqual(TEXT("Each refused hit is a deflection (feedback)"), W.Boss->GetDeflectedCount(), 3);
 	return true;
 }
@@ -209,12 +210,12 @@ bool FETMGatebreakerCollapseTest::RunTest(const FString&)
 	W.Activate();
 	W.BreakNodes();
 
-	// Bring the core to 900 (30%) inside one window.
+	// Bring the core to 1950 (30%) inside one window.
 	TestTrue(TEXT("Core opens"), W.RunUntil([&W] { return W.Boss->IsTargetExposed(AGatebreaker::CorePart); }, 20.f));
-	W.Shoot(W.Boss->Core, 2000.f);
-	TestEqual(TEXT("Core at 1000: still phase 2"), W.Boss->GetBossPhase(), EGatebreakerPhase::Breach);
-	W.Shoot(W.Boss->Core, 100.f);
-	TestEqual(TEXT("Core at 900 (30%): phase 3"), W.Boss->GetBossPhase(), EGatebreakerPhase::Collapse);
+	W.Shoot(W.Boss->Core, 4500.f);
+	TestEqual(TEXT("Core at 2000: still phase 2"), W.Boss->GetBossPhase(), EGatebreakerPhase::Breach);
+	W.Shoot(W.Boss->Core, 50.f);
+	TestEqual(TEXT("Core at 1950 (30%): phase 3"), W.Boss->GetBossPhase(), EGatebreakerPhase::Collapse);
 
 	// Phase 3: the next attack is the artillery shot. It is telegraphed, hits for 35, and does not open the core.
 	TestTrue(TEXT("Artillery charges"), W.RunUntil([&W] { return W.Boss->GetCurrentAttack() == EGatebreakerAttack::Artillery; }, 20.f));
@@ -232,7 +233,7 @@ bool FETMGatebreakerCollapseTest::RunTest(const FString&)
 	TestTrue(TEXT("Core keeps opening in phase 3"), W.RunUntil([&W] { return W.Boss->IsTargetExposed(AGatebreaker::CorePart); }, 3.f));
 	TestTrue(TEXT("Braced blast"), FMath::IsNearlyEqual(RigBeforeFurnace - W.Rig->GetCurrent(), 11.25f, 0.01f));
 
-	W.Shoot(W.Boss->Core, 900.f);
+	W.Shoot(W.Boss->Core, 1950.f);
 	TestEqual(TEXT("Core destroyed: boss dies"), W.Boss->GetState(), EEnemyState::Dying);
 	TestEqual(TEXT("Phase Destroyed"), W.Boss->GetBossPhase(), EGatebreakerPhase::Destroyed);
 	W.Run(W.Boss->DeathDuration + 0.1f);
@@ -244,7 +245,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMGatebreakerExposureTest, "ETM.Bosses.Gatebr
 bool FETMGatebreakerExposureTest::RunTest(const FString&)
 {
 	// Two real heat-model cannons fire whenever the core is open and vent when it is shut. Every shot lands
-	// on the core with the expected value at 70% accuracy (0.7 x 80). The bible and balance_sim.py expect
+	// on the core with the expected value at 70% accuracy (0.7 x 50). The bible and balance_sim.py expect
 	// about 2.2 exposures, so the core must fall in the 2nd or 3rd window, never the 1st, never past the 4th.
 	FTestWorld W;
 	W.Rig->MaxIntegrity = 10000.f; // the test is about the core, not survival
@@ -263,7 +264,7 @@ bool FETMGatebreakerExposureTest::RunTest(const FString&)
 			{
 				if (ETM::StepHeat(Cannon, Tuning, Frame72 / 4.f, bOpen, !bOpen) && bOpen)
 				{
-					W.Shoot(W.Boss->Core, 0.7f * WeakPointShot);
+					W.Shoot(W.Boss->Core, 0.7f * CannonWeakPointShot);
 				}
 			}
 		}
@@ -304,7 +305,7 @@ bool FETMGatebreakerNoSoftlockTest::RunTest(const FString&)
 
 	// The same in phase 3.
 	TestTrue(TEXT("Core opens"), W.RunUntil([&W] { return W.Boss->IsTargetExposed(AGatebreaker::CorePart); }, 20.f));
-	W.Shoot(W.Boss->Core, 2200.f);
+	W.Shoot(W.Boss->Core, 4600.f); // to 1900, below 30% (1950)
 	TestEqual(TEXT("Phase 3"), W.Boss->GetBossPhase(), EGatebreakerPhase::Collapse);
 	const int32 BeforeCollapse = W.Boss->GetCoreExposureCount();
 	W.Run(120.f);
@@ -351,7 +352,7 @@ bool FETMGatebreakerDirectorTest::RunTest(const FString&)
 	TestEqual(TEXT("Mission failed"), Mission->GetState(), EMissionState::Failed);
 	TestTrue(TEXT("Retry"), Mission->RetryFromLastCheckpoint());
 	TestTrue(TEXT("Boss is back"), W.Boss->IsActive());
-	TestEqual(TEXT("P-04: boss at full health"), W.Boss->GetCoreHealth(), 3000.f);
+	TestEqual(TEXT("P-04: boss at full health"), W.Boss->GetCoreHealth(), 6500.f);
 	TestFalse(TEXT("Nodes are whole again"), W.Boss->IsPartBroken(AGatebreaker::NodeLeftPart));
 	TestEqual(TEXT("Rig preset 300"), W.Rig->GetCurrent(), 300.f);
 
@@ -359,7 +360,7 @@ bool FETMGatebreakerDirectorTest::RunTest(const FString&)
 	W.Run(W.Boss->SpawnDuration + 0.1f);
 	W.BreakNodes();
 	TestTrue(TEXT("Core opens"), W.RunUntil([&W] { return W.Boss->IsTargetExposed(AGatebreaker::CorePart); }, 20.f));
-	W.Shoot(W.Boss->Core, 3000.f);
+	W.Shoot(W.Boss->Core, 6500.f);
 	for (float T = 0.f; T < 7.f; T += Frame72) Director->AdvanceDirector(Frame72);
 	TestEqual(TEXT("Boss death completes the director's boss phase"), Director->GetPhaseIndex(), 1);
 	return true;

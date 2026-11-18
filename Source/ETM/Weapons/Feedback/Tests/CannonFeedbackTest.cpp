@@ -163,7 +163,7 @@ bool FETMFeedbackSettingsTest::RunTest(const FString&)
 	W.Feedback->HapticStrength = 1.f;
 	W.Cannon->ResetHeat();
 	W.Cannon->SetTriggerHeld(true);
-	for (int32 Frame = 0; Frame < 72 * 4 && !W.Cannon->IsOverheated(); ++Frame) W.Cannon->AdvanceCannon(Frame72);
+	for (int32 Frame = 0; Frame < 72 * 11 && !W.Cannon->IsOverheated(); ++Frame) W.Cannon->AdvanceCannon(Frame72);
 	W.Cannon->SetTriggerHeld(false);
 	TestTrue(TEXT("Cannon locked"), W.Cannon->IsOverheated());
 	TestEqual(TEXT("Overheat buzz is full strength"), W.Feedback->GetLastHaptic().Amplitude, 1.f);

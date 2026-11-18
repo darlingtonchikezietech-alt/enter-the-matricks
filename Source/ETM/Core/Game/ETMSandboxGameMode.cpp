@@ -120,15 +120,15 @@ void AETMSandboxGameMode::BuildSandbox()
 	}
 
 	// Objective: in front of and below the rig, centre lane (P-22).
-	Objective = SpawnSandboxActor<AMissionObjective>(FVector(450.f, 0.f, 0.f));
-	if (Objective) SpawnMesh(TEXT("Cube"), FVector(450.f, 0.f, 60.f), FVector(160.f, 220.f, 120.f)); // the equipment's bulk
+	Objective = SpawnSandboxActor<AMissionObjective>(FVector(350.f, 0.f, 0.f));
+	if (Objective) SpawnMesh(TEXT("Cube"), FVector(350.f, 0.f, 60.f), FVector(160.f, 220.f, 120.f)); // the equipment's bulk
 
-	// Entrances 25 m out on each lane, facing the rig.
+	// Entrances 18 m out on each lane, facing the rig (brought in after the owner's headset test, T-0055).
 	Director = SpawnSandboxActor<AEncounterDirector>(FVector::ZeroVector);
 	if (!Director) return;
 	for (const float Yaw : LaneYaw)
 	{
-		const FVector At = FRotator(0.f, Yaw, 0.f).RotateVector(FVector(2500.f, 0.f, 0.f));
+		const FVector At = FRotator(0.f, Yaw, 0.f).RotateVector(FVector(1800.f, 0.f, 0.f));
 		Director->Entrances.Add(SpawnSandboxActor<ATargetPoint>(At, FRotator(0.f, Yaw + 180.f, 0.f)));
 	}
 

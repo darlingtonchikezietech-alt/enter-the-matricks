@@ -1,9 +1,9 @@
 // In-engine parity test: the cannon heat model must reproduce the tracker's tools/balance_sim.py.
 // Spec: PRODUCT_BIBLE.md section 5, P-01. Owned by T-0010.
 //
-// The reference numbers below are the sim's own output (bible v1.1 tuning):
+// The reference numbers below are the sim's own output (bible v1.4 tuning, P-34):
 //   python3 -c "import balance_sim as b; print(b.time_to_overheat(), b.recovery_time(False), b.sustained_dps('hold'), b.sustained_dps('burst_vent'))"
-//   -> (2.751 s, 12 shots), 4.011 s, 60.0 dps, 90.67 dps
+//   -> (9.901 s, 100 shots), 4.011 s, 168.75 dps, 204.17 dps
 // If a tuning value changes, change the sim and this file together.
 //
 // Run headless: UnrealEditor-Cmd ETM.uproject -ExecCmds="Automation RunTests ETM.Weapons.HeatParity; Quit" -unattended -nullrdr -testexit="Automation Test Queue Empty"
@@ -19,12 +19,12 @@ namespace
 	const EAutomationTestFlags ETMHeatTestFlags = EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter | EAutomationTestFlags::CriticalPriority;
 
 	// balance_sim.py reference values.
-	constexpr float SimOverheatSeconds = 2.751f;
-	constexpr int32 SimOverheatShots = 12;
+	constexpr float SimOverheatSeconds = 9.901f;
+	constexpr int32 SimOverheatShots = 100;
 	constexpr float SimRecoverySeconds = 4.011f;
-	constexpr float SimHoldDps = 60.0f;
-	constexpr float SimBurstVentDps = 90.667f;
-	constexpr float Damage = 40.0f;
+	constexpr float SimHoldDps = 168.75f;
+	constexpr float SimBurstVentDps = 204.167f;
+	constexpr float Damage = 25.0f;
 
 	enum class EPolicy { Hold, HoldThenVent, BurstVent };
 
@@ -124,8 +124,8 @@ namespace
 		float OverheatSeconds = 0.f;
 		int32 OverheatShots = 0;
 		TimeToOverheat(Stepper, T, OverheatSeconds, OverheatShots);
-		Test.TestEqual(FString::Printf(TEXT("%s: overheat after 12 shots"), Label), OverheatShots, SimOverheatShots);
-		Test.TestTrue(FString::Printf(TEXT("%s: overheat at 2.75 s (got %.3f)"), Label, OverheatSeconds), FMath::IsNearlyEqual(OverheatSeconds, SimOverheatSeconds, TimeTolerance));
+		Test.TestEqual(FString::Printf(TEXT("%s: overheat after 100 shots"), Label), OverheatShots, SimOverheatShots);
+		Test.TestTrue(FString::Printf(TEXT("%s: overheat at 9.9 s (got %.3f)"), Label, OverheatSeconds), FMath::IsNearlyEqual(OverheatSeconds, SimOverheatSeconds, TimeTolerance));
 
 		const float Passive = RecoveryTime(Stepper, T, false);
 		const float Vented = RecoveryTime(Stepper, T, true);
@@ -135,10 +135,10 @@ namespace
 		const float Hold = SustainedDps(Stepper, T, EPolicy::Hold);
 		const float HoldThenVent = SustainedDps(Stepper, T, EPolicy::HoldThenVent);
 		const float BurstVent = SustainedDps(Stepper, T, EPolicy::BurstVent);
-		Test.TestTrue(FString::Printf(TEXT("%s: trigger held = 60 dps (got %.2f)"), Label, Hold), FMath::IsNearlyEqual(Hold, SimHoldDps, DpsTolerance));
+		Test.TestTrue(FString::Printf(TEXT("%s: trigger held = 169 dps (got %.2f)"), Label, Hold), FMath::IsNearlyEqual(Hold, SimHoldDps, DpsTolerance));
 		Test.TestTrue(FString::Printf(TEXT("%s: hold-then-vent gains nothing over hold (P-01, got %.2f)"), Label, HoldThenVent), FMath::IsNearlyEqual(HoldThenVent, Hold, DpsTolerance));
-		Test.TestTrue(FString::Printf(TEXT("%s: burst + vent = 91 dps (got %.2f)"), Label, BurstVent), FMath::IsNearlyEqual(BurstVent, SimBurstVentDps, DpsTolerance));
-		Test.TestTrue(FString::Printf(TEXT("%s: burst + vent beats holding the trigger"), Label), BurstVent > Hold * 1.2f);
+		Test.TestTrue(FString::Printf(TEXT("%s: burst + vent = 204 dps (got %.2f)"), Label, BurstVent), FMath::IsNearlyEqual(BurstVent, SimBurstVentDps, DpsTolerance));
+		Test.TestTrue(FString::Printf(TEXT("%s: burst + vent beats holding the trigger"), Label), BurstVent > Hold * 1.15f);
 	}
 }
 
@@ -146,7 +146,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMHeatParitySimStepTest, "ETM.Weapons.HeatPar
 bool FETMHeatParitySimStepTest::RunTest(const FString&)
 {
 	// Same 1 ms step as the sim. Times match to the step size; dps may differ by one shot per minute
-	// (0.67 dps) because the model accumulates in float and the sim in double.
+	// (0.42 dps) because the model accumulates in float and the sim in double.
 	FStepper Stepper;
 	CheckParity(*this, Stepper, TEXT("1 ms steps"), 0.002f, 0.7f);
 	return true;
@@ -157,14 +157,11 @@ bool FETMHeatParityFrameStepTest::RunTest(const FString&)
 {
 	// What the headset actually runs: 72 Hz frames with the component's 1/240 s sub-steps.
 	//
-	// KNOWN DRIFT (tracker T-0043): StepHeat resets the fire cooldown on the sub-step where it expires
-	// instead of carrying the remainder, so each shot slips up to 3.5 ms. Measured on 17 Nov 2026:
-	// overheat 2.792 s (sim 2.751), burst + vent 89.33 dps (sim 90.67). The tolerances below allow
-	// three frames and 2% so the drift is visible but not failing. When T-0043 lands, tighten them to
-	// one frame (1/72 s + 1 ms) and 1% (0.9 dps).
+	// StepHeat carries the fire-cooldown remainder (T-0043), so frame stepping keeps the sim's fire rate:
+	// within one frame (1/72 s + 1 ms) and 1% of the sim.
 	FStepper Stepper;
 	Stepper.bFrameStepping = true;
-	CheckParity(*this, Stepper, TEXT("72 Hz frames"), 3.f / 72.f + 0.001f, 1.8f);
+	CheckParity(*this, Stepper, TEXT("72 Hz frames"), 1.f / 72.f + 0.001f, 2.05f);
 	return true;
 }
 
@@ -174,11 +171,11 @@ bool FETMHeatParityTuningTest::RunTest(const FString&)
 	// The values a designer sees on UCannonComponent must be the same ones the sim uses.
 	const FCannonTuning Tuning;
 	const ETM::FHeatTuning Heat = Tuning.ToHeatTuning();
-	TestEqual(TEXT("FIRE_RATE"), Heat.FireRate, 4.0f);
-	TestEqual(TEXT("DAMAGE"), Tuning.Damage, 40.0f);
+	TestEqual(TEXT("FIRE_RATE"), Heat.FireRate, 10.0f);
+	TestEqual(TEXT("DAMAGE"), Tuning.Damage, 25.0f);
 	TestEqual(TEXT("WEAK_MULT"), Tuning.WeakPointMultiplier, 2.0f);
 	TestEqual(TEXT("HEAT_CAP"), Heat.HeatCapacity, 100.0f);
-	TestEqual(TEXT("HEAT_PER_SHOT"), Heat.HeatPerShot, 9.0f);
+	TestEqual(TEXT("HEAT_PER_SHOT"), Heat.HeatPerShot, 1.0f);
 	TestEqual(TEXT("PASSIVE_COOL"), Heat.PassiveCooling, 18.0f);
 	TestEqual(TEXT("PASSIVE_DELAY"), Heat.PassiveCoolingDelay, 0.4f);
 	TestEqual(TEXT("VENT_COOL"), Heat.VentCooling, 40.0f);
