@@ -13,7 +13,7 @@
 #include "Objectives/MissionStateSubsystem.h"
 #include "Player/XRSeatedRigPawn.h"
 #include "Combat/IntegrityComponent.h"
-#include "Components/DirectionalLightComponent.h"
+#include "Components/LightComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -83,7 +83,7 @@ bool FETMSandboxRangeTest::RunTest(const FString&)
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
 	{
 		++Lights;
-		if (It->GetComponent()->CastShadows) ++ShadowLights;
+		if (It->GetLightComponent()->CastShadows) ++ShadowLights;
 	}
 	TestEqual(TEXT("One light"), Lights, 1);
 	TestEqual(TEXT("No shadow-casting lights (Quest baseline)"), ShadowLights, 0);

@@ -7,7 +7,7 @@
 #include "Objectives/MissionStateSubsystem.h"
 #include "Player/XRSeatedRigPawn.h"
 #include "ETM.h"
-#include "Components/DirectionalLightComponent.h"
+#include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/StaticMesh.h"
@@ -30,8 +30,9 @@ bool AETMSandboxGameMode::ShouldBuildSandbox() const
 	const UWorld* World = GetWorld();
 	if (!bBuildSandbox || !World) return false;
 	if (!SandboxMaps.Contains(UGameplayStatics::GetCurrentLevelName(World, /*bRemovePrefixString*/ true))) return false;
-	for (TActorIterator<AMissionObjective> It(GetWorld()); It; ++It) return false; // a real arena already has one
-	return true;
+	// A real arena already has an objective. (Checked without a one-pass loop: Clang rejects those on Android.)
+	TActorIterator<AMissionObjective> FirstObjective(GetWorld());
+	return !FirstObjective;
 }
 
 void AETMSandboxGameMode::StartPlay()
@@ -98,9 +99,10 @@ void AETMSandboxGameMode::BuildSandbox()
 	// Light: one movable directional light from above and in front, no shadows.
 	if (ADirectionalLight* Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 160.f, 0.f)))
 	{
-		Sun->GetComponent()->SetMobility(EComponentMobility::Movable);
-		Sun->GetComponent()->SetCastShadows(false);
-		Sun->GetComponent()->SetIntensity(6.f);
+		ULightComponent* Light = Sun->GetLightComponent();
+		Light->SetMobility(EComponentMobility::Movable);
+		Light->SetCastShadows(false);
+		Light->SetIntensity(6.f);
 	}
 
 	// Floor: 60 m square, its top at z = 0 where the rig sits.
