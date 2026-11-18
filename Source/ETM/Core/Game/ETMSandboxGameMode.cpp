@@ -211,10 +211,11 @@ void AETMSandboxGameMode::BuildSandbox()
 	{
 		// The open-ended practice range: Shardlings from the left and centre, drones from the right.
 		BuildObjective();
-		FEncounterPhase Practice = Phase(TEXT("Practice"), 3600.f, 5, {
-			Group(AShardling::StaticClass(), 300, 0, 6.f, 4.f),
-			Group(AShardling::StaticClass(), 300, 1, 9.f, 8.f),
-			Group(ANeedleDrone::StaticClass(), 150, 2, 12.f, 15.f),
+		FEncounterPhase Practice = Phase(TEXT("Practice"), 3600.f, 6, {
+			Group(AShardling::StaticClass(), 300, 0, 3.f, 2.f),
+			Group(AShardling::StaticClass(), 300, 1, 4.5f, 4.f),
+			Group(ANeedleDrone::StaticClass(), 150, 2, 6.f, 6.f),
+			Group(ANeedleDrone::StaticClass(), 150, 0, 8.f, 10.f),
 		}, false);
 		Practice.bCompleteWhenCleared = false;
 		StartEncounter({ Practice });
@@ -288,24 +289,29 @@ void AETMSandboxGameMode::StartEncounter(const TArray<FEncounterPhase>& Phases)
 
 TArray<FEncounterPhase> AETMSandboxGameMode::MakeLevelPhases(int32 LevelIndex)
 {
-	// Stand-ins until the real arenas and their storyboards (T-0020, T-0027): about two minutes each, using
-	// the archetypes each level introduces first. Entrances: 0 left duct/trench, 1 centre, 2 right conveyor/balcony.
+	// Stand-ins until the real arenas and their storyboards (T-0020, T-0027), using the archetypes each level
+	// introduces first. Entrances: 0 left duct/trench, 1 centre, 2 right conveyor/balcony.
+	// Owner headset test (T-0056): spawns were too slow, so gaps are 1.5-2.5 s and slots short (the P-13 60%
+	// rule holds a cleared phase until 60% of its slot); drones come from the left as well as the right. The
+	// real arenas keep the bible's layout (flyers on the right) unless the owner changes it.
 	if (LevelIndex == 0)
 	{
 		return {
-			Phase(TEXT("Breach: duct"), 40.f, 4, { Group(AShardling::StaticClass(), 8, 0, 2.5f, 2.f) }, true),
-			Phase(TEXT("Breach: conveyor"), 45.f, 5, {
-				Group(ANeedleDrone::StaticClass(), 5, 2, 3.f, 1.f),
-				Group(AShardling::StaticClass(), 5, 1, 3.5f, 3.f) }, false),
+			Phase(TEXT("Breach: duct"), 25.f, 5, { Group(AShardling::StaticClass(), 9, 0, 1.5f, 1.f) }, true),
+			Phase(TEXT("Breach: conveyor"), 30.f, 7, {
+				Group(ANeedleDrone::StaticClass(), 5, 2, 2.f, 1.f),
+				Group(ANeedleDrone::StaticClass(), 3, 0, 2.5f, 3.f),
+				Group(AShardling::StaticClass(), 6, 1, 1.8f, 2.f) }, false),
 		};
 	}
 	return {
-		Phase(TEXT("Signal: trench"), 40.f, 5, {
-			Group(AShardling::StaticClass(), 6, 0, 2.5f, 2.f),
-			Group(ASiphon::StaticClass(), 2, 1, 8.f, 4.f) }, true),
-		Phase(TEXT("Signal: balcony"), 45.f, 6, {
-			Group(ANeedleDrone::StaticClass(), 6, 2, 2.5f, 1.f),
-			Group(AShardling::StaticClass(), 6, 0, 3.f, 3.f) }, false),
+		Phase(TEXT("Signal: trench"), 25.f, 6, {
+			Group(AShardling::StaticClass(), 7, 0, 1.5f, 1.f),
+			Group(ASiphon::StaticClass(), 2, 1, 2.5f, 2.f) }, true),
+		Phase(TEXT("Signal: balcony"), 30.f, 7, {
+			Group(ANeedleDrone::StaticClass(), 5, 2, 1.8f, 1.f),
+			Group(ANeedleDrone::StaticClass(), 4, 0, 2.2f, 2.f),
+			Group(AShardling::StaticClass(), 6, 1, 1.8f, 2.f) }, false),
 	};
 }
 

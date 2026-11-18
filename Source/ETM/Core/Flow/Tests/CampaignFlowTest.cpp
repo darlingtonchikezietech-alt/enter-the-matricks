@@ -11,6 +11,7 @@
 #include "Core/Game/ETMSandboxGameMode.h"
 #include "Combat/DefenseComponent.h"
 #include "Encounters/EncounterDirector.h"
+#include "Enemies/Archetypes/NeedleDrone.h"
 #include "Objectives/MissionObjective.h"
 #include "Objectives/MissionStateSubsystem.h"
 #include "Player/XRSeatedRigPawn.h"
@@ -337,18 +338,25 @@ bool FETMFlowLevelPhasesTest::RunTest(const FString&)
 		const TArray<FEncounterPhase> Phases = AETMSandboxGameMode::MakeLevelPhases(Level);
 		TestTrue(FString::Printf(TEXT("L%d has phases"), Level + 1), Phases.Num() >= 2);
 		int32 Enemies = 0;
+		TSet<int32> DroneLanes;
+		float LongestGap = 0.f;
 		for (const FEncounterPhase& P : Phases)
 		{
 			TestTrue(FString::Printf(TEXT("L%d %s completes when cleared"), Level + 1, *P.Name.ToString()), P.bCompleteWhenCleared);
 			for (const FEncounterSpawnGroup& G : P.Groups)
 			{
 				Enemies += G.Count;
+				LongestGap = FMath::Max(LongestGap, G.Interval);
+				if (G.EnemyClass && G.EnemyClass->IsChildOf(ANeedleDrone::StaticClass())) DroneLanes.Add(G.EntranceIndex);
 				TestTrue(TEXT("Group has an enemy class"), G.EnemyClass != nullptr);
 				TestTrue(TEXT("Group uses one of the three lanes"), G.EntranceIndex >= 0 && G.EntranceIndex < 3);
 			}
 		}
 		TestTrue(FString::Printf(TEXT("L%d is finite and short (%d enemies)"), Level + 1, Enemies), Enemies > 0 && Enemies <= 40);
 		TestTrue(TEXT("First phase records a start checkpoint for retries"), Phases[0].bCheckpointOnStart);
+		// Owner headset test (T-0056): steady pressure, and drones from more than one side.
+		TestTrue(FString::Printf(TEXT("L%d spawn gaps at most 2.5 s (longest %.1f)"), Level + 1, LongestGap), LongestGap <= 2.5f);
+		TestTrue(FString::Printf(TEXT("L%d drones come from %d lanes"), Level + 1, DroneLanes.Num()), DroneLanes.Num() >= 2);
 	}
 	return true;
 }

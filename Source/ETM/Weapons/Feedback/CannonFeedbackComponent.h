@@ -56,6 +56,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") FVector GetRecoilOffset() const;
 	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") bool IsMuzzleFlashVisible() const;
+	/** Muzzle flashes shown so far (rapid fire shows one every MuzzleFlashMinInterval, not one per shot). */
+	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") int32 GetMuzzleFlashesShown() const { return MuzzleFlashesShown; }
+	/** Where the muzzle flash sits, in this component's frame. */
+	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") FVector GetMuzzleFlashOffset() const;
 	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") int32 GetActiveTracerCount() const;
 	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") int32 GetActiveImpactCount() const;
 	UFUNCTION(BlueprintPure, Category = "ETM|Feedback") FCannonHapticPulse GetLastHaptic() const { return LastHaptic; }
@@ -76,9 +80,21 @@ public:
 	// ---- Tuning (prototype values; tune in the M1 playtest) ----
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Recoil") float RecoilKickCm = 6.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Recoil") float RecoilPitchDeg = 2.5f;
-	/** Time for the barrel to settle back. Shorter than the 0.25 s between shots so each shot reads on its own. */
+	/** Time for the barrel to settle back. At 10 shots/s (P-34) the kicks overlap into a steady shudder. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Recoil") float RecoilRecoverSeconds = 0.15f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash") float MuzzleFlashSeconds = 0.05f;
+	/**
+	 * At 10 shots/s a flash on every shot strobes beside the player's eyes (owner headset test, T-0056; bible
+	 * section 11: essential weapon effects outside the central sightline). The first shot of a burst always
+	 * flashes; after that at most one flash per this many seconds.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash", meta = (ClampMin = "0")) float MuzzleFlashMinInterval = 0.25f;
+	/** How far past the muzzle the flash sits, away from the face. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash") float MuzzleFlashForwardCm = 40.f;
+	/** Flash mesh scale; reduced flash uses half. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash") float MuzzleFlashScale = 0.35f;
+	/** Brightness of the muzzle flash relative to the discharge colour (tracers and impacts use 4). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash") float MuzzleFlashBrightness = 1.5f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Flash") float ImpactFlashSeconds = 0.1f;
 	/** Head reaches the end at half the lifetime; the tail follows. "Rapidly animated cosmetic tracer" (bible section 5). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Feedback|Tracer") float TracerSeconds = 0.08f;
@@ -132,6 +148,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> Barrel;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> MuzzleFlash;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> DischargeInstance;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> MuzzleFlashInstance;
 	/** Keeps the pooled meshes alive for the garbage collector. */
 	UPROPERTY(Transient) TArray<TObjectPtr<UStaticMeshComponent>> PooledMeshes;
 
@@ -140,6 +157,8 @@ private:
 	FCannonHapticPulse LastHaptic;
 	float RecoilTime = -1.f;
 	float FlashAge = -1.f;
+	float FlashCooldown = 0.f;
+	int32 MuzzleFlashesShown = 0;
 	float HapticRemaining = 0.f;
 	int32 NextTracer = 0;
 	int32 NextImpact = 0;
