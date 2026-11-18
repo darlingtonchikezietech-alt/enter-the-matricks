@@ -1,11 +1,16 @@
 #include "Core/Game/ETMSandboxGameMode.h"
+#include "Core/Flow/CampaignFlow.h"
+#include "Core/Flow/CampaignFlowSubsystem.h"
+#include "Core/Flow/ETMMenuPanel.h"
 #include "Encounters/EncounterDirector.h"
 #include "Enemies/Archetypes/NeedleDrone.h"
 #include "Enemies/Archetypes/Shardling.h"
+#include "Enemies/Archetypes/Siphon.h"
 #include "Input/RigPlayerController.h"
 #include "Objectives/MissionObjective.h"
 #include "Objectives/MissionStateSubsystem.h"
 #include "Player/XRSeatedRigPawn.h"
+#include "Save/ETMSaveStore.h"
 #include "ETM.h"
 #include "Components/LightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -19,10 +24,50 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
+#define LOCTEXT_NAMESPACE "ETMSandbox"
+
+namespace
+{
+	const float LaneYaw[] = { -35.f, 0.f, 35.f };
+
+	FEncounterSpawnGroup Group(TSubclassOf<AEnemyBase> Class, int32 Count, int32 Entrance, float Interval, float Delay)
+	{
+		FEncounterSpawnGroup G;
+		G.EnemyClass = Class;
+		G.Count = Count;
+		G.EntranceIndex = Entrance;
+		G.Interval = Interval;
+		G.StartDelay = Delay;
+		return G;
+	}
+
+	FEncounterPhase Phase(const TCHAR* Name, float Slot, int32 MaxActive, TArray<FEncounterSpawnGroup> Groups, bool bStartCheckpoint)
+	{
+		FEncounterPhase P;
+		P.Name = Name;
+		P.SlotSeconds = Slot;
+		P.MaxActive = MaxActive;
+		P.Groups = MoveTemp(Groups);
+		P.bCompleteWhenCleared = true;
+		P.bCheckpointOnStart = bStartCheckpoint;
+		if (bStartCheckpoint) P.CheckpointName = TEXT("Start");
+		return P;
+	}
+
+	FString ResultLines(const FETMMissionResult& R)
+	{
+		return FString::Printf(TEXT("Time %s    Accuracy %.0f%%\nWeak-point hits %d    Damage prevented %.0f\nRetries %d    Score %d"),
+			*ETMFlow::FormatTime(R.DurationSeconds), R.GetAccuracy() * 100.f, R.WeakPointHits, R.DamagePrevented, R.Retries, R.Score);
+	}
+}
+
 AETMSandboxGameMode::AETMSandboxGameMode()
 {
 	DefaultPawnClass = AXRSeatedRigPawn::StaticClass();
 	PlayerControllerClass = ARigPlayerController::StaticClass();
+	// Ticks only to apply the fade to the light, which must also work while the world is paused.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bTickEvenWhenPaused = true;
 }
 
 bool AETMSandboxGameMode::ShouldBuildSandbox() const
@@ -35,9 +80,18 @@ bool AETMSandboxGameMode::ShouldBuildSandbox() const
 	return !FirstObjective;
 }
 
+void AETMSandboxGameMode::SetFlow(UETMCampaignFlow* InFlow)
+{
+	if (Flow == InFlow) return;
+	if (Flow) Flow->OnStageChanged.RemoveAll(this);
+	Flow = InFlow;
+	if (Flow) Flow->OnStageChanged.AddUniqueDynamic(this, &AETMSandboxGameMode::HandleStageChanged);
+}
+
 void AETMSandboxGameMode::StartPlay()
 {
 	Super::StartPlay();
+	SetFlow(UETMCampaignFlowSubsystem::FindFlow(this));
 	// Local players have been spawned by now; make sure each rig counts for the mission.
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -47,11 +101,20 @@ void AETMSandboxGameMode::StartPlay()
 	{
 		BuildSandbox();
 	}
+	// A transition was waiting for this world: start the fade-in.
+	if (Flow) Flow->NotifyWorldReady(GetWorld());
+}
+
+void AETMSandboxGameMode::EndPlay(const EEndPlayReason::Type Reason)
+{
+	SetFlow(nullptr); // the flow outlives this world
+	Super::EndPlay(Reason);
 }
 
 void AETMSandboxGameMode::RestartPlayer(AController* NewPlayer)
 {
 	Super::RestartPlayer(NewPlayer);
+	if (bBuilt && NewPlayer) PlaceRigOnRange(NewPlayer->GetPawn());
 	RegisterRig(NewPlayer);
 }
 
@@ -62,6 +125,38 @@ void AETMSandboxGameMode::RegisterRig(AController* Controller)
 	if (!Rig || !Mission) return;
 	Mission->RegisterRig(Rig->RigIntegrity, Rig->Defense);
 	if (Director && !Director->RigActor) Director->RigActor = Rig;
+}
+
+APawn* AETMSandboxGameMode::FindRigPawn() const
+{
+	if (const APlayerController* Player = GetWorld()->GetFirstPlayerController())
+	{
+		if (APawn* Pawn = Player->GetPawn()) return Pawn;
+	}
+	TActorIterator<AXRSeatedRigPawn> First(GetWorld());
+	return First ? *First : nullptr;
+}
+
+void AETMSandboxGameMode::PlaceRigOnRange(APawn* Rig) const
+{
+	if (!Rig) return;
+	const FVector Mount(0.f, 0.f, RigBaseHeight);
+	if (!Rig->GetActorLocation().Equals(Mount, 1.f) || !Rig->GetActorRotation().IsNearlyZero(0.1f))
+	{
+		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to its mount."), *Rig->GetActorLocation().ToCompactString());
+	}
+	Rig->SetActorLocationAndRotation(Mount, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
+}
+
+float AETMSandboxGameMode::GetCurrentLightIntensity() const
+{
+	return LightIntensity * (1.f - (Flow ? Flow->GetFadeAlpha() : 0.f));
+}
+
+void AETMSandboxGameMode::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (Sun) Sun->GetLightComponent()->SetIntensity(GetCurrentLightIntensity());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -94,22 +189,60 @@ void AETMSandboxGameMode::BuildSandbox()
 {
 	if (bBuilt || !GetWorld()) return;
 	bBuilt = true;
-	UE_LOG(LogETM, Display, TEXT("Building the sandbox range (T-0053)."));
+	const EETMFlowStage Stage = Flow ? Flow->GetStageToBuild() : EETMFlowStage::Practice;
+	UE_LOG(LogETM, Display, TEXT("Building the sandbox range for flow stage %d (T-0053, T-0031)."), static_cast<int32>(Stage));
+	PlaceRigOnRange(FindRigPawn());
+	BuildRange();
 
-	// Light: one movable directional light from above and in front, no shadows.
-	if (ADirectionalLight* Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 160.f, 0.f)))
+	switch (Stage)
+	{
+	case EETMFlowStage::Level:
+	{
+		BuildObjective();
+		StartEncounter(MakeLevelPhases(Flow->GetLevelIndex()));
+		if (Director) Director->OnEncounterComplete.AddUniqueDynamic(this, &AETMSandboxGameMode::HandleEncounterComplete);
+		Flow->BeginLevel(GetWorld(), Cast<AXRSeatedRigPawn>(FindRigPawn()));
+		break;
+	}
+	case EETMFlowStage::Title:
+		ShowPanel(EETMFlowStage::Title);
+		break;
+	default:
+	{
+		// The open-ended practice range: Shardlings from the left and centre, drones from the right.
+		BuildObjective();
+		FEncounterPhase Practice = Phase(TEXT("Practice"), 3600.f, 5, {
+			Group(AShardling::StaticClass(), 300, 0, 6.f, 4.f),
+			Group(AShardling::StaticClass(), 300, 1, 9.f, 8.f),
+			Group(ANeedleDrone::StaticClass(), 150, 2, 12.f, 15.f),
+		}, false);
+		Practice.bCompleteWhenCleared = false;
+		StartEncounter({ Practice });
+		if (Flow) ShowPanel(EETMFlowStage::Practice);
+		break;
+	}
+	}
+}
+
+void AETMSandboxGameMode::BuildRange()
+{
+	// Light: one movable directional light, from above and behind the rig so everything facing the player
+	// (enemies, panels, the objective) is lit. No shadows.
+	Sun = SpawnSandboxActor<ADirectionalLight>(FVector(0.f, 0.f, 1000.f), FRotator(-50.f, 200.f, 0.f));
+	if (Sun)
 	{
 		ULightComponent* Light = Sun->GetLightComponent();
 		Light->SetMobility(EComponentMobility::Movable);
 		Light->SetCastShadows(false);
-		Light->SetIntensity(6.f);
+		Light->SetIntensity(GetCurrentLightIntensity()); // a world loaded mid-transition starts black
 	}
 
-	// Floor: 60 m square, its top at z = 0 where the rig sits.
+	// Floor: 60 m square, its top at z = 0.
 	SpawnMesh(TEXT("Cube"), FVector(2000.f, 0.f, -5.f), FVector(6000.f, 6000.f, 10.f));
+	// The rig's mount: a block under the seat, kept behind the cannon mounts so low shots clear it.
+	if (RigBaseHeight > 1.f) SpawnMesh(TEXT("Cube"), FVector(-30.f, 0.f, RigBaseHeight * 0.5f), FVector(120.f, 160.f, RigBaseHeight));
 
 	// Distance posts down three lanes: left duct, centre door, right conveyor (bible section 9 layout).
-	const float LaneYaw[] = { -35.f, 0.f, 35.f };
 	for (const float Yaw : LaneYaw)
 	{
 		for (const float Metres : { 5.f, 15.f, 30.f, 45.f })
@@ -119,10 +252,6 @@ void AETMSandboxGameMode::BuildSandbox()
 		}
 	}
 
-	// Objective: in front of and below the rig, centre lane (P-22).
-	Objective = SpawnSandboxActor<AMissionObjective>(FVector(350.f, 0.f, 0.f));
-	if (Objective) SpawnMesh(TEXT("Cube"), FVector(350.f, 0.f, 60.f), FVector(160.f, 220.f, 120.f)); // the equipment's bulk
-
 	// Entrances 18 m out on each lane, facing the rig (brought in after the owner's headset test, T-0055).
 	Director = SpawnSandboxActor<AEncounterDirector>(FVector::ZeroVector);
 	if (!Director) return;
@@ -131,34 +260,22 @@ void AETMSandboxGameMode::BuildSandbox()
 		const FVector At = FRotator(0.f, Yaw, 0.f).RotateVector(FVector(1800.f, 0.f, 0.f));
 		Director->Entrances.Add(SpawnSandboxActor<ATargetPoint>(At, FRotator(0.f, Yaw + 180.f, 0.f)));
 	}
-
-	// One long practice phase: Shardlings from the left and centre, drones from the right.
-	FEncounterPhase Practice;
-	Practice.Name = TEXT("Practice");
-	Practice.SlotSeconds = 3600.f;
-	Practice.MaxActive = 5;
-	const auto Group = [](TSubclassOf<AEnemyBase> Class, int32 Count, int32 Entrance, float Interval, float Delay)
-	{
-		FEncounterSpawnGroup G;
-		G.EnemyClass = Class;
-		G.Count = Count;
-		G.EntranceIndex = Entrance;
-		G.Interval = Interval;
-		G.StartDelay = Delay;
-		return G;
-	};
-	Practice.Groups = {
-		Group(AShardling::StaticClass(), 300, 0, 6.f, 4.f),
-		Group(AShardling::StaticClass(), 300, 1, 9.f, 8.f),
-		Group(ANeedleDrone::StaticClass(), 150, 2, 12.f, 15.f),
-	};
-	Director->Phases = { Practice };
 	Director->EntranceScatter = 150.f;
-	if (const APlayerController* Player = GetWorld()->GetFirstPlayerController())
-	{
-		Director->RigActor = Player->GetPawn();
-	}
+	Director->RigActor = FindRigPawn();
+}
 
+void AETMSandboxGameMode::BuildObjective()
+{
+	// Objective: in front of and below the rig, centre lane (P-22). Its bulk is low (90 cm) so it never hides
+	// the centre lane from the mounted rig (owner headset test, T-0031).
+	Objective = SpawnSandboxActor<AMissionObjective>(FVector(350.f, 0.f, 0.f));
+	if (Objective) SpawnMesh(TEXT("Cube"), FVector(350.f, 0.f, 45.f), FVector(160.f, 220.f, 90.f)); // the equipment's bulk
+}
+
+void AETMSandboxGameMode::StartEncounter(const TArray<FEncounterPhase>& Phases)
+{
+	if (!Director) return;
+	Director->Phases = Phases;
 	if (UMissionStateSubsystem* Mission = GetWorld()->GetSubsystem<UMissionStateSubsystem>())
 	{
 		Mission->OnMissionFailed.AddUniqueDynamic(this, &AETMSandboxGameMode::HandleMissionFailed);
@@ -169,9 +286,139 @@ void AETMSandboxGameMode::BuildSandbox()
 	}
 }
 
+TArray<FEncounterPhase> AETMSandboxGameMode::MakeLevelPhases(int32 LevelIndex)
+{
+	// Stand-ins until the real arenas and their storyboards (T-0020, T-0027): about two minutes each, using
+	// the archetypes each level introduces first. Entrances: 0 left duct/trench, 1 centre, 2 right conveyor/balcony.
+	if (LevelIndex == 0)
+	{
+		return {
+			Phase(TEXT("Breach: duct"), 40.f, 4, { Group(AShardling::StaticClass(), 8, 0, 2.5f, 2.f) }, true),
+			Phase(TEXT("Breach: conveyor"), 45.f, 5, {
+				Group(ANeedleDrone::StaticClass(), 5, 2, 3.f, 1.f),
+				Group(AShardling::StaticClass(), 5, 1, 3.5f, 3.f) }, false),
+		};
+	}
+	return {
+		Phase(TEXT("Signal: trench"), 40.f, 5, {
+			Group(AShardling::StaticClass(), 6, 0, 2.5f, 2.f),
+			Group(ASiphon::StaticClass(), 2, 1, 8.f, 4.f) }, true),
+		Phase(TEXT("Signal: balcony"), 45.f, 6, {
+			Group(ANeedleDrone::StaticClass(), 6, 2, 2.5f, 1.f),
+			Group(AShardling::StaticClass(), 6, 0, 3.f, 3.f) }, false),
+	};
+}
+
+// ---------------------------------------------------------------------------------------------
+// Panels and flow events
+// ---------------------------------------------------------------------------------------------
+
+void AETMSandboxGameMode::ShowPanel(EETMFlowStage Stage)
+{
+	if (Panel)
+	{
+		Panel->Destroy();
+		Panel = nullptr;
+	}
+
+	FText Title;
+	FString Body;
+	TArray<FETMMenuButton> Buttons;
+	FVector At = PanelLocation;
+	const auto Button = [&Buttons](const TCHAR* Id, const FText& Label)
+	{
+		FETMMenuButton& B = Buttons.AddDefaulted_GetRef();
+		B.Id = FName(Id);
+		B.Label = Label;
+	};
+
+	switch (Stage)
+	{
+	case EETMFlowStage::Title:
+		Title = LOCTEXT("Title", "ENTER THE MATRICKS");
+		Body = TEXT("RIG-6 online. Haven Nine is evacuating.\nAim a cannon at a button and fire.");
+		Button(TEXT("Start"), LOCTEXT("Start", "START CAMPAIGN"));
+		Button(TEXT("Practice"), LOCTEXT("Practice", "PRACTICE RANGE"));
+		break;
+	case EETMFlowStage::LevelResults:
+	{
+		const int32 Index = Flow ? Flow->GetLevelIndex() : 0;
+		const FETMMissionResult R = Flow ? Flow->GetLevelResult(Index) : FETMMissionResult();
+		Title = FText::FromString(FString::Printf(TEXT("LEVEL %d COMPLETE: %s"), Index + 1, ETMFlow::LevelTitle(Index)));
+		Body = TEXT("Power reaches the evacuation railway.\n") + ResultLines(R);
+		if (Flow && Flow->Store)
+		{
+			const FETMLevelRecord Record = Flow->Store->GetLevelRecord(R.Level);
+			if (Record.bHasBest) Body += FString::Printf(TEXT("\nBest %d"), Record.Best.Score);
+		}
+		Button(TEXT("Continue"), LOCTEXT("Continue", "CONTINUE"));
+		break;
+	}
+	case EETMFlowStage::Ending:
+		Title = LOCTEXT("EndingTitle", "THE LAST SIGNAL");
+		Body = TEXT("MARA: \"Last carriage is clear. You bought us a tomorrow.\"\n\nThe shutters close. The machines falter.\nFar above, a distant signal answers.\nThe invasion continues.");
+		Button(TEXT("Skip"), LOCTEXT("Skip", "SKIP"));
+		break;
+	case EETMFlowStage::CampaignResults:
+	{
+		Title = LOCTEXT("CampaignTitle", "HAVEN NINE EVACUATED");
+		for (int32 i = 0; i < ETMFlow::LevelCount; ++i)
+		{
+			const FETMMissionResult R = Flow ? Flow->GetLevelResult(i) : FETMMissionResult();
+			Body += FString::Printf(TEXT("L%d %s: %s, %.0f%%, score %d\n"), i + 1, ETMFlow::LevelTitle(i),
+				*ETMFlow::FormatTime(R.DurationSeconds), R.GetAccuracy() * 100.f, R.Score);
+		}
+		Body += FString::Printf(TEXT("Campaign score %d"), Flow ? Flow->GetCampaignScore() : 0);
+		Button(TEXT("Title"), LOCTEXT("ReturnToTitle", "RETURN TO TITLE"));
+		break;
+	}
+	case EETMFlowStage::Practice:
+		// Small and high on the left, out of the lanes, so practice fire does not hit it by accident.
+		Title = LOCTEXT("PracticeTitle", "PRACTICE RANGE");
+		Button(TEXT("Title"), LOCTEXT("Back", "TITLE"));
+		At = FVector(220.f, -170.f, 175.f);
+		break;
+	default:
+		return;
+	}
+
+	// In the rig's frame, rotated to face it (the panel's +X points back at the player).
+	FTransform RigFrame = FTransform::Identity;
+	if (const APawn* Rig = FindRigPawn()) RigFrame = FTransform(FRotator(0.f, Rig->GetActorRotation().Yaw, 0.f), Rig->GetActorLocation());
+	Panel = SpawnSandboxActor<AETMMenuPanel>(RigFrame.TransformPosition(At), RigFrame.Rotator() + FRotator(0.f, 180.f, 0.f));
+	if (!Panel) return;
+	Panel->Setup(Title, Body, Buttons);
+	Panel->OnButtonPressed.AddUniqueDynamic(this, &AETMSandboxGameMode::HandlePanelButton);
+}
+
+void AETMSandboxGameMode::HandlePanelButton(FName ButtonId)
+{
+	if (!Flow) return;
+	if (ButtonId == TEXT("Start")) Flow->StartCampaign();
+	else if (ButtonId == TEXT("Practice")) Flow->StartPractice();
+	else if (ButtonId == TEXT("Continue")) Flow->Continue();
+	else if (ButtonId == TEXT("Skip")) Flow->SkipEnding();
+	else if (ButtonId == TEXT("Title")) Flow->ReturnToTitle();
+}
+
+void AETMSandboxGameMode::HandleStageChanged(EETMFlowStage NewStage, int32 LevelIndex)
+{
+	// Stages shown in place, in the world that just finished a level.
+	if (NewStage == EETMFlowStage::LevelResults || NewStage == EETMFlowStage::Ending || NewStage == EETMFlowStage::CampaignResults)
+	{
+		ShowPanel(NewStage);
+	}
+}
+
+void AETMSandboxGameMode::HandleEncounterComplete()
+{
+	if (Flow) Flow->NotifyLevelComplete(GetWorld());
+}
+
 void AETMSandboxGameMode::HandleMissionFailed(EMissionFailReason Reason)
 {
-	// No failure screen yet (T-0031): retry by itself after a short beat.
+	// No failure screen yet: retry by itself after a short beat, while a level or the practice range is on.
+	if (Flow && Flow->GetStage() != EETMFlowStage::Level && Flow->GetStage() != EETMFlowStage::Practice) return;
 	GetWorldTimerManager().SetTimer(RetryTimer, this, &AETMSandboxGameMode::DoRetry, FMath::Max(0.01f, AutoRetrySeconds), false);
 }
 
@@ -182,3 +429,5 @@ void AETMSandboxGameMode::DoRetry()
 		Mission->RetryFromLastCheckpoint();
 	}
 }
+
+#undef LOCTEXT_NAMESPACE
