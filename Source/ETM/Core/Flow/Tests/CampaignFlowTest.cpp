@@ -206,9 +206,11 @@ bool FETMFlowSandboxTest::RunTest(const FString&)
 		UWorld* World = Wrapper.GetTestWorld();
 		AETMSandboxGameMode* Mode = World->GetAuthGameMode<AETMSandboxGameMode>();
 		if (!Mode) { AddError(TEXT("No sandbox game mode")); return false; }
-		AXRSeatedRigPawn* Rig = World->SpawnActor<AXRSeatedRigPawn>(FVector::ZeroVector, FRotator::ZeroRotator);
+		// Spawned high and turned, as the Entry map's player start does: the range puts the rig on its floor.
+		AXRSeatedRigPawn* Rig = World->SpawnActor<AXRSeatedRigPawn>(FVector(0.f, 0.f, 250.f), FRotator(0.f, 30.f, 0.f));
 		Mode->SetFlow(Flow);
 		Mode->BuildSandbox();
+		TestTrue(TEXT("Rig placed at the range origin, on the floor"), Rig->GetActorLocation().IsNearlyZero(0.1f) && Rig->GetActorRotation().IsNearlyZero(0.01f));
 
 		AETMMenuPanel* Panel = Mode->GetPanel();
 		TestNotNull(TEXT("Title panel"), Panel);
@@ -222,6 +224,16 @@ bool FETMFlowSandboxTest::RunTest(const FString&)
 		const FVector StartAt = Panel->GetButtonBox(TEXT("Start"))->GetComponentLocation();
 		const FVector PracticeAt = Panel->GetButtonBox(TEXT("Practice"))->GetComponentLocation();
 		TestTrue(TEXT("First button on the player's left"), StartAt.Y < PracticeAt.Y);
+		// Both cannons can aim at every button without hitting their pitch or yaw limits.
+		for (const FName Id : Panel->GetButtonIds())
+		{
+			for (UCannonComponent* Cannon : { Rig->LeftCannon.Get(), Rig->RightCannon.Get() })
+			{
+				const FRotator Aim = (Panel->GetButtonBox(Id)->GetComponentLocation() - Cannon->GetComponentLocation()).Rotation();
+				TestTrue(FString::Printf(TEXT("%s reachable (pitch %.1f, yaw %.1f)"), *Id.ToString(), Aim.Pitch, Aim.Yaw),
+					Aim.Pitch > -25.f && Aim.Pitch < 40.f && FMath::Abs(Aim.Yaw) < 60.f);
+			}
+		}
 
 		// Not armed straight away: a held trigger cannot pick.
 		TestFalse(TEXT("Not armed at once"), Panel->IsArmed());

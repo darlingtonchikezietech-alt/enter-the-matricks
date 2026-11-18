@@ -114,6 +114,7 @@ void AETMSandboxGameMode::EndPlay(const EEndPlayReason::Type Reason)
 void AETMSandboxGameMode::RestartPlayer(AController* NewPlayer)
 {
 	Super::RestartPlayer(NewPlayer);
+	if (bBuilt && NewPlayer) PlaceRigOnRange(NewPlayer->GetPawn());
 	RegisterRig(NewPlayer);
 }
 
@@ -134,6 +135,16 @@ APawn* AETMSandboxGameMode::FindRigPawn() const
 	}
 	TActorIterator<AXRSeatedRigPawn> First(GetWorld());
 	return First ? *First : nullptr;
+}
+
+void AETMSandboxGameMode::PlaceRigOnRange(APawn* Rig) const
+{
+	if (!Rig) return;
+	if (!Rig->GetActorLocation().IsNearlyZero(1.f) || !Rig->GetActorRotation().IsNearlyZero(0.1f))
+	{
+		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to the range origin."), *Rig->GetActorLocation().ToCompactString());
+	}
+	Rig->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 float AETMSandboxGameMode::GetCurrentLightIntensity() const
@@ -179,6 +190,7 @@ void AETMSandboxGameMode::BuildSandbox()
 	bBuilt = true;
 	const EETMFlowStage Stage = Flow ? Flow->GetStageToBuild() : EETMFlowStage::Practice;
 	UE_LOG(LogETM, Display, TEXT("Building the sandbox range for flow stage %d (T-0053, T-0031)."), static_cast<int32>(Stage));
+	PlaceRigOnRange(FindRigPawn());
 	BuildRange();
 
 	switch (Stage)
@@ -360,14 +372,16 @@ void AETMSandboxGameMode::ShowPanel(EETMFlowStage Stage)
 		// Small and high on the left, out of the lanes, so practice fire does not hit it by accident.
 		Title = LOCTEXT("PracticeTitle", "PRACTICE RANGE");
 		Button(TEXT("Title"), LOCTEXT("Back", "TITLE"));
-		At = FVector(220.f, -170.f, 190.f);
+		At = FVector(220.f, -170.f, 175.f);
 		break;
 	default:
 		return;
 	}
 
-	// Rotated to face the rig (the panel's +X points back at the player).
-	Panel = SpawnSandboxActor<AETMMenuPanel>(At, FRotator(0.f, 180.f, 0.f));
+	// In the rig's frame, rotated to face it (the panel's +X points back at the player).
+	FTransform RigFrame = FTransform::Identity;
+	if (const APawn* Rig = FindRigPawn()) RigFrame = FTransform(FRotator(0.f, Rig->GetActorRotation().Yaw, 0.f), Rig->GetActorLocation());
+	Panel = SpawnSandboxActor<AETMMenuPanel>(RigFrame.TransformPosition(At), RigFrame.Rotator() + FRotator(0.f, 180.f, 0.f));
 	if (!Panel) return;
 	Panel->Setup(Title, Body, Buttons);
 	Panel->OnButtonPressed.AddUniqueDynamic(this, &AETMSandboxGameMode::HandlePanelButton);
