@@ -65,6 +65,7 @@ bool FETMSandboxRangeTest::RunTest(const FString&)
 	AXRSeatedRigPawn* Rig = World->SpawnActor<AXRSeatedRigPawn>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->GetSubsystem<UMissionStateSubsystem>()->RegisterRig(Rig->RigIntegrity, Rig->Defense);
 
+	Mode->SetFlow(nullptr); // no campaign flow: the practice range (T-0031 adds the campaign stages)
 	Mode->BuildSandbox();
 	AEncounterDirector* Director = Mode->GetSandboxDirector();
 	AMissionObjective* Objective = Mode->GetSandboxObjective();
