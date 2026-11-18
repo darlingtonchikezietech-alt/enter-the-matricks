@@ -13,8 +13,9 @@
 //     results (Level 1) or the ending and campaign results (Level 2) on panels in the same world.
 //   - Practice (or no flow at all, as in tests): the long practice encounter from T-0053.
 // Fades are done by dimming the range's only light: the Entry map has no sky, so the view goes fully black.
-// The rig is moved to the range's origin with its base on the floor: the Entry map's own player start is
-// above the floor, which left the panels below the cannons' reach (owner headset test, T-0031).
+// The rig is moved to the range's origin, on a 1 m stabilizer mount, so the player looks down over the
+// objective into all three lanes (P-22; owner headset tests, T-0031). The Entry map's own player start is
+// ignored: it put the rig at an arbitrary height.
 // Failure retries by itself after 3 s (no failure screen yet).
 // No .umap is needed. Other maps and automated tests never get the range unless BuildSandbox is called.
 #pragma once
@@ -73,6 +74,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Sandbox") float AutoRetrySeconds = 3.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Sandbox") int32 EncounterSeed = 2026;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Sandbox") float LightIntensity = 6.f;
+	/** Height of the rig's base above the range floor. The objective's bulk stays well below the eye (P-22). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Sandbox") float RigBaseHeight = 100.f;
 	/** Where panels stand, in the rig's own frame: in front, at the cannons' height so they can be aimed at level (bible section 11: 1-2 m). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ETM|Sandbox") FVector PanelLocation = FVector(190.f, 0.f, 105.f);
 
@@ -90,7 +93,7 @@ private:
 	void StartEncounter(const TArray<FEncounterPhase>& Phases);
 	void ShowPanel(EETMFlowStage Stage);
 	APawn* FindRigPawn() const;
-	/** Puts the rig at the range's origin, its base on the floor, facing down the centre lane. */
+	/** Puts the rig at the range's origin on its mount (RigBaseHeight), facing down the centre lane. */
 	void PlaceRigOnRange(APawn* Rig) const;
 
 	UFUNCTION() void HandleMissionFailed(EMissionFailReason Reason);

@@ -210,7 +210,7 @@ bool FETMFlowSandboxTest::RunTest(const FString&)
 		AXRSeatedRigPawn* Rig = World->SpawnActor<AXRSeatedRigPawn>(FVector(0.f, 0.f, 250.f), FRotator(0.f, 30.f, 0.f));
 		Mode->SetFlow(Flow);
 		Mode->BuildSandbox();
-		TestTrue(TEXT("Rig placed at the range origin, on the floor"), Rig->GetActorLocation().IsNearlyZero(0.1f) && Rig->GetActorRotation().IsNearlyZero(0.01f));
+		TestTrue(TEXT("Rig placed at the range origin, on its mount"), Rig->GetActorLocation().Equals(FVector(0.f, 0.f, Mode->RigBaseHeight), 0.1f) && Rig->GetActorRotation().IsNearlyZero(0.01f));
 
 		AETMMenuPanel* Panel = Mode->GetPanel();
 		TestNotNull(TEXT("Title panel"), Panel);

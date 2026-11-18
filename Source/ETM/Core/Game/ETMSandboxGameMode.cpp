@@ -140,11 +140,12 @@ APawn* AETMSandboxGameMode::FindRigPawn() const
 void AETMSandboxGameMode::PlaceRigOnRange(APawn* Rig) const
 {
 	if (!Rig) return;
-	if (!Rig->GetActorLocation().IsNearlyZero(1.f) || !Rig->GetActorRotation().IsNearlyZero(0.1f))
+	const FVector Mount(0.f, 0.f, RigBaseHeight);
+	if (!Rig->GetActorLocation().Equals(Mount, 1.f) || !Rig->GetActorRotation().IsNearlyZero(0.1f))
 	{
-		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to the range origin."), *Rig->GetActorLocation().ToCompactString());
+		UE_LOG(LogETM, Display, TEXT("Sandbox: rig moved from %s to its mount."), *Rig->GetActorLocation().ToCompactString());
 	}
-	Rig->SetActorLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
+	Rig->SetActorLocationAndRotation(Mount, FRotator::ZeroRotator, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 float AETMSandboxGameMode::GetCurrentLightIntensity() const
@@ -236,8 +237,10 @@ void AETMSandboxGameMode::BuildRange()
 		Light->SetIntensity(GetCurrentLightIntensity()); // a world loaded mid-transition starts black
 	}
 
-	// Floor: 60 m square, its top at z = 0 where the rig sits.
+	// Floor: 60 m square, its top at z = 0.
 	SpawnMesh(TEXT("Cube"), FVector(2000.f, 0.f, -5.f), FVector(6000.f, 6000.f, 10.f));
+	// The rig's mount: a block under the seat, kept behind the cannon mounts so low shots clear it.
+	if (RigBaseHeight > 1.f) SpawnMesh(TEXT("Cube"), FVector(-30.f, 0.f, RigBaseHeight * 0.5f), FVector(120.f, 160.f, RigBaseHeight));
 
 	// Distance posts down three lanes: left duct, centre door, right conveyor (bible section 9 layout).
 	for (const float Yaw : LaneYaw)
@@ -263,9 +266,10 @@ void AETMSandboxGameMode::BuildRange()
 
 void AETMSandboxGameMode::BuildObjective()
 {
-	// Objective: in front of and below the rig, centre lane (P-22).
+	// Objective: in front of and below the rig, centre lane (P-22). Its bulk is low (90 cm) so it never hides
+	// the centre lane from the mounted rig (owner headset test, T-0031).
 	Objective = SpawnSandboxActor<AMissionObjective>(FVector(350.f, 0.f, 0.f));
-	if (Objective) SpawnMesh(TEXT("Cube"), FVector(350.f, 0.f, 60.f), FVector(160.f, 220.f, 120.f)); // the equipment's bulk
+	if (Objective) SpawnMesh(TEXT("Cube"), FVector(350.f, 0.f, 45.f), FVector(160.f, 220.f, 90.f)); // the equipment's bulk
 }
 
 void AETMSandboxGameMode::StartEncounter(const TArray<FEncounterPhase>& Phases)

@@ -78,6 +78,15 @@ bool FETMSandboxRangeTest::RunTest(const FString&)
 	const FVector Eye = Rig->GetActorTransform().TransformPosition(Rig->DesignEyeLocation);
 	TestTrue(TEXT("Objective is in front of the rig"), Objective->GetActorLocation().X > 200.f && FMath::Abs(Objective->GetActorLocation().Y) < 1.f);
 	TestTrue(TEXT("Objective is below the eye (P-22)"), Objective->GetActorLocation().Z < Eye.Z);
+	// Nothing the range built blocks the view down the centre lane: the line from the eye to a point on the
+	// floor 10 m out stays clear (owner headset test, T-0031: the objective bulk hid the centre lane).
+	{
+		FHitResult Block;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(Rig);
+		const bool bBlocked = World->LineTraceSingleByChannel(Block, Eye, FVector(1000.f, 0.f, 50.f), ECC_Visibility, Params);
+		TestFalse(FString::Printf(TEXT("Centre lane visible from the eye (blocked by %s)"), bBlocked && Block.GetActor() ? *Block.GetActor()->GetName() : TEXT("nothing")), bBlocked);
+	}
 	TestEqual(TEXT("Three lane entrances"), Director->Entrances.Num(), 3);
 	TestTrue(TEXT("No entrance is behind the player"), Director->ValidateEntrances().IsEmpty());
 	int32 Lights = 0, ShadowLights = 0;
