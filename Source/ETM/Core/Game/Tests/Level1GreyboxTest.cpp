@@ -7,6 +7,7 @@
 
 #include "Core/Flow/CampaignFlow.h"
 #include "Core/Game/ETMSandboxGameMode.h"
+#include "Enemies/Archetypes/Shardling.h"
 #include "Encounters/EncounterDirector.h"
 #include "Objectives/MissionObjective.h"
 #include "Objectives/MissionStateSubsystem.h"
@@ -185,6 +186,48 @@ bool FETMArenaModeTest::RunTest(const FString&)
 	Director->OnEncounterComplete.Broadcast();
 	TestEqual(TEXT("Completing the arena reports to the flow"), Flow->GetStage(), EETMFlowStage::LevelResults);
 	TestNotNull(TEXT("Results panel in the arena"), Mode->GetPanel());
+	Wrapper.DestroyTestWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FETMGroundFollowTest, "ETM.Level1.EnemiesClimbOverLowCover", ETMLevelTestFlags)
+bool FETMGroundFollowTest::RunTest(const FString&)
+{
+	// Owner headset test: Shardlings walked straight through the pipe cover. A floor, a pipe lying across the
+	// lane, and a Shardling walking over it to the objective.
+	FTestWorldWrapper Wrapper;
+	Wrapper.CreateTestWorld(EWorldType::Game);
+	Wrapper.BeginPlayInTestWorld();
+	UWorld* World = Wrapper.GetTestWorld();
+	const auto Shape = [World](const TCHAR* Name, const FVector& At, const FVector& Size, const FRotator& Rot)
+	{
+		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(At, Rot);
+		Actor->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+		Actor->GetStaticMeshComponent()->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Engine/BasicShapes/%s.%s"), Name, Name)));
+		Actor->GetStaticMeshComponent()->SetCollisionProfileName(TEXT("BlockAll"));
+		Actor->SetActorScale3D(Size / 100.f);
+		return Actor;
+	};
+	Shape(TEXT("Cube"), FVector(500.f, 0.f, -5.f), FVector(4000.f, 1000.f, 10.f), FRotator::ZeroRotator);
+	Shape(TEXT("Cylinder"), FVector(600.f, 0.f, 30.f), FVector(60.f, 60.f, 420.f), FRotator(0.f, 0.f, 90.f)); // pipe across the lane, top at 60
+
+	AMissionObjective* Objective = World->SpawnActor<AMissionObjective>(FVector(1400.f, 0.f, 0.f), FRotator::ZeroRotator);
+	World->GetSubsystem<UMissionStateSubsystem>()->RegisterObjective(Objective);
+	AShardling* Shardling = World->SpawnActor<AShardling>(FVector(-500.f, 0.f, 0.f), FRotator::ZeroRotator);
+	Shardling->Activate(FTransform(FVector(0.f, 0.f, 0.f)));
+
+	float ZOverPipe = -1.f, MaxZ = 0.f;
+	for (float T = 0.f; T < 20.f && Shardling->GetState() != EEnemyState::Attacking; T += Frame72)
+	{
+		Shardling->SimulateStep(Frame72);
+		const FVector At = Shardling->GetActorLocation();
+		if (FMath::Abs(At.X - 600.f) < 10.f) ZOverPipe = At.Z;
+		MaxZ = FMath::Max(MaxZ, At.Z);
+	}
+	TestTrue(TEXT("Reached the objective"), Shardling->GetActorLocation().X > 1000.f);
+	TestTrue(FString::Printf(TEXT("On top of the pipe while crossing it (z %.0f)"), ZOverPipe), ZOverPipe >= 50.f);
+	TestTrue(FString::Printf(TEXT("Back on the floor after it (z %.1f)"), Shardling->GetActorLocation().Z), FMath::Abs(Shardling->GetActorLocation().Z) < 1.f);
+	TestTrue(TEXT("Did not fly off"), MaxZ < 100.f);
 	Wrapper.DestroyTestWorld(false);
 	return true;
 }

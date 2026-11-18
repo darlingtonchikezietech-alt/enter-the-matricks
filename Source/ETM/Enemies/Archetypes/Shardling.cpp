@@ -1,4 +1,5 @@
 #include "Enemies/Archetypes/Shardling.h"
+#include "Enemies/Archetypes/ArchetypeSupport.h"
 #include "Enemies/Archetypes/EnemyPlaceholderMesh.h"
 #include "Objectives/MissionObjective.h"
 #include "Objectives/MissionStateSubsystem.h"
@@ -85,7 +86,7 @@ void AShardling::UpdateBehavior(float DeltaSeconds)
 		AMissionObjective* Objective = ResolveTarget();
 		if (!Objective) return;
 
-		// Scrape forward along the ground; height stays where the spawn put it.
+		// Scrape forward along the ground, over low cover rather than through it (T-0020).
 		const FVector Here = GetActorLocation();
 		FVector ToTarget = Objective->GetActorLocation() - Here;
 		ToTarget.Z = 0.f;
@@ -97,7 +98,7 @@ void AShardling::UpdateBehavior(float DeltaSeconds)
 		}
 		const FVector Direction = ToTarget / Distance;
 		const float Step = FMath::Min(MoveSpeed * DeltaSeconds, Distance - AttackRange);
-		SetActorLocationAndRotation(Here + Direction * Step, Direction.Rotation());
+		SetActorLocationAndRotation(ETMArchetype::FollowGround(this, Here, Here + Direction * Step), Direction.Rotation());
 		break;
 	}
 	case EEnemyState::Attacking:
